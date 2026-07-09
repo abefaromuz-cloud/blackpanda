@@ -26,6 +26,10 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/reports',   require('./routes/reports'));
 app.use('/api/import',    require('./routes/import'));
 app.use('/api/activity-log', require('./routes/activityLog'));
+app.use('/api/reservations', require('./routes/reservations'));
+app.use('/api/bank-accounts', require('./routes/bankAccounts'));
+app.use('/api/msg-templates', require('./routes/msgTemplates'));
+app.use('/api/broadcast', require('./routes/broadcast'));
 
 // Раздача собранного фронтенда
 const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');

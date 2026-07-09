@@ -20,6 +20,8 @@ import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Import from './pages/Import';
 import ActivityLog from './pages/ActivityLog';
+import Scan from './pages/Scan';
+import Broadcast from './pages/Broadcast';
 import { useAuth } from './auth/AuthContext';
 import { useLang } from './i18n/LangContext';
 
@@ -74,6 +76,8 @@ export default function App() {
         <Route path="reports" element={<PermGuard page="reports"><Reports /></PermGuard>} />
         <Route path="import" element={<PermGuard page="import"><Import /></PermGuard>} />
         <Route path="activity-log" element={<PermGuard page="activity_log"><ActivityLog /></PermGuard>} />
+        <Route path="scan" element={<PermGuard page="scan"><Scan /></PermGuard>} />
+        <Route path="broadcast" element={<PermGuard page="broadcast"><Broadcast /></PermGuard>} />
         <Route path="admin" element={<AdminGuard><Admin /></AdminGuard>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

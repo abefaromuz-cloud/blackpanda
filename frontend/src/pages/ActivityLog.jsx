@@ -10,7 +10,7 @@ export default function ActivityLog() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('activityLog')}</h1>
+      <h1 className="text-2xl font-black mb-6">{t('activityLog')}</h1>
       <div className="card">
         <table className="w-full text-sm">
           <thead>

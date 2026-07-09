@@ -36,7 +36,7 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('settings')}</h1>
+      <h1 className="text-2xl font-black mb-6">{t('settings')}</h1>
       {msg && <div className="mb-4 p-3 rounded-lg bg-accent/10 border border-accent text-accent2 text-sm">{msg}</div>}
 
       <div className="grid md:grid-cols-2 gap-4">

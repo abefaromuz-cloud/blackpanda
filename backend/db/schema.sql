@@ -49,6 +49,8 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('staff','import',true,true),
   ('staff','employees',true,false),
   ('staff','activity_log',false,false),
+  ('staff','scan',true,true),
+  ('staff','broadcast',true,true),
   ('accountant','dashboard',true,false),
   ('accountant','warehouse',true,false),
   ('accountant','clients',true,false),
@@ -64,6 +66,8 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('accountant','import',false,false),
   ('accountant','employees',true,true),
   ('accountant','activity_log',true,false),
+  ('accountant','scan',false,false),
+  ('accountant','broadcast',false,false),
   ('client','client_portal',true,false)
 ON CONFLICT (role, page_key) DO NOTHING;
 
@@ -244,5 +248,71 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC)
 
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other';
+ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS bank_key TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS balance_rub NUMERIC(14,2) NOT NULL DEFAULT 0;
+
+-- Резервирование конкретного серийника за клиентом до дедлайна
+CREATE TABLE IF NOT EXISTS reservations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  serial_id UUID NOT NULL REFERENCES serials(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id),
+  deadline TIMESTAMPTZ,
+  note TEXT,
+  pay_type TEXT DEFAULT 'none', -- none | partial | full
+  pay_amount_rub NUMERIC(12,2) DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Долги клиента (открываются при частичной оплате продажи)
+CREATE TABLE IF NOT EXISTS debts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  sale_id UUID REFERENCES sales(id),
+  amount_rub NUMERIC(12,2) NOT NULL,
+  amount_paid_rub NUMERIC(12,2) NOT NULL DEFAULT 0,
+  due_date DATE,
+  status TEXT NOT NULL DEFAULT 'open', -- open | paid
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- История изменений баланса предоплаты клиента
+CREATE TABLE IF NOT EXISTS balance_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  amount_rub NUMERIC(12,2) NOT NULL, -- знак: + пополнение, - списание
+  note TEXT,
+  balance_after_rub NUMERIC(14,2) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Банковские счета (помимо наличной кассы)
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  key TEXT UNIQUE NOT NULL,      -- напр. 'sber','alfa','tbank'
+  name TEXT NOT NULL,
+  balance_rub NUMERIC(14,2) NOT NULL DEFAULT 0
+);
+INSERT INTO bank_accounts (key, name) VALUES
+  ('sber','Сбербанк'), ('alfa','Альфа-банк'), ('tbank','Т-банк')
+ON CONFLICT (key) DO NOTHING;
+
+-- Шаблоны сообщений для клиентов (используются в карточке клиента и в рассылке)
+CREATE TABLE IF NOT EXISTS msg_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO msg_templates (name, text) VALUES
+  ('Подтверждение заказа','Здравствуйте, {name}! Ваш заказ подтверждён. Сумма: {total}. Спасибо за покупку!'),
+  ('Напоминание о долге','Здравствуйте, {name}! Напоминаем о задолженности: {total}. Пожалуйста, оплатите в ближайшее время.')
+ON CONFLICT DO NOTHING;
+
+-- История курса ЦБ РФ (для сравнительного графика со своим курсом)
+CREATE TABLE IF NOT EXISTS cbr_rate_history (
+  date DATE PRIMARY KEY,
+  rate NUMERIC(10,4) NOT NULL
+);
 
 INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

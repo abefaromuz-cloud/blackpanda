@@ -19,7 +19,7 @@ export default function Finance() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('finance')}</h1>
+      <h1 className="text-2xl font-black mb-6">{t('finance')}</h1>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label={t('revenue')} value={Math.round(d.revenue).toLocaleString('ru-RU') + ' ₽'} />
         <StatCard label={t('grossProfit')} value={Math.round(d.grossProfit).toLocaleString('ru-RU') + ' ₽'} color="green" />

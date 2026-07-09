@@ -8,13 +8,17 @@ const emptyForm = { brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '
 
 export default function Warehouse() {
   const [laptops, setLaptops] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('warehouse', 'edit');
 
-  function load() { api.get('/laptops').then(r => setLaptops(r.data)); }
+  function load() {
+    api.get('/laptops').then(r => setLaptops(r.data));
+    api.get('/reservations').then(r => setReservations(r.data));
+  }
   useEffect(load, []);
 
   async function submit(e) {
@@ -23,12 +27,32 @@ export default function Warehouse() {
     setForm(emptyForm); setShowForm(false); load();
   }
 
+  async function releaseReservation(id) {
+    await api.delete(`/reservations/${id}`);
+    load();
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
-        <h1 className="text-xl font-black">{t('warehouse')}</h1>
+        <h1 className="text-2xl font-black">{t('warehouse')}</h1>
         {canEdit && <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>+ {t('addModel')}</button>}
       </div>
+
+      {reservations.length > 0 && (
+        <div className="card mb-5">
+          <div className="font-bold text-sm mb-3">🔒 {t('reservations')}</div>
+          {reservations.map(r => (
+            <div key={r.id} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0">
+              <span>{r.brand} {r.series} · <span className="font-mono text-text3">{r.serial}</span> {r.client_name && `· ${r.client_name}`}</span>
+              <span className="flex items-center gap-2">
+                {r.deadline && <span className="text-xs text-text3">до {new Date(r.deadline).toLocaleDateString('ru-RU')}</span>}
+                {canEdit && <button className="text-red text-xs hover:underline" onClick={() => releaseReservation(r.id)}>{t('releaseReservation')}</button>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showForm && canEdit && (
         <form onSubmit={submit} className="card mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">

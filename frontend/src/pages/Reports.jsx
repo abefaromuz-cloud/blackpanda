@@ -36,7 +36,7 @@ export default function Reports() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('reports')}</h1>
+      <h1 className="text-2xl font-black mb-6">{t('reports')}</h1>
 
       <div className="card mb-5">
         <div className="font-bold text-sm mb-3">{t('salesReport')}</div>

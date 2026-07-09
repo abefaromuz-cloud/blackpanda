@@ -54,7 +54,7 @@ export default function Import() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('importPage')}</h1>
+      <h1 className="text-2xl font-black mb-6">{t('importPage')}</h1>
       <ImportBlock
         title={t('importClients')}
         columns={['name', 'phone', 'telegram']}

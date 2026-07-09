@@ -35,4 +35,39 @@ router.get('/', authenticate, requirePermission('analytics', 'view'), async (req
   } catch (err) { console.error(err); res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Временной ряд продаж/себестоимости/маржи — для линейного графика с переключением периода
+router.get('/timeseries', authenticate, requirePermission('analytics', 'view'), async (req, res) => {
+  const period = req.query.period || '30'; // '7' | '30' | '365' | 'years'
+  try {
+    let rows;
+    if (period === 'years') {
+      rows = await pool.query(`
+        SELECT to_char(s.created_at,'YYYY') AS lbl,
+          COALESCE(SUM(si.total_cny),0) AS revenue_cny,
+          COALESCE(SUM(si.price_cost_cny*si.qty),0) AS cost_cny
+        FROM sales s JOIN sale_items si ON si.sale_id=s.id
+        GROUP BY 1 ORDER BY 1
+      `);
+    } else {
+      const days = parseInt(period) || 30;
+      rows = await pool.query(`
+        SELECT to_char(d.day,'DD.MM') AS lbl, d.day,
+          COALESCE(SUM(si.total_cny) FILTER (WHERE date_trunc('day', s.created_at) = d.day), 0) AS revenue_cny,
+          COALESCE(SUM(si.price_cost_cny*si.qty) FILTER (WHERE date_trunc('day', s.created_at) = d.day), 0) AS cost_cny
+        FROM generate_series(now()::date - ($1::int - 1), now()::date, interval '1 day') AS d(day)
+        LEFT JOIN sales s ON date_trunc('day', s.created_at) = d.day
+        LEFT JOIN sale_items si ON si.sale_id = s.id
+        GROUP BY d.day ORDER BY d.day
+      `, [days]);
+    }
+    const points = rows.rows.map(r => ({
+      lbl: r.lbl,
+      revenue_cny: Number(r.revenue_cny),
+      cost_cny: Number(r.cost_cny),
+      margin_cny: Number(r.revenue_cny) - Number(r.cost_cny),
+    }));
+    res.json(points);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
 module.exports = router;

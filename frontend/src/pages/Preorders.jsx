@@ -36,7 +36,7 @@ export default function Preorders() {
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
-        <h1 className="text-xl font-black">{t('preorders')}</h1>
+        <h1 className="text-2xl font-black">{t('preorders')}</h1>
         {canEdit && <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>+ {t('addPreorder')}</button>}
       </div>
 

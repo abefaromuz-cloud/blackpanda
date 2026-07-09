@@ -21,7 +21,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5">{t('dashboard')}</h1>
+      <h1 className="text-3xl font-black mb-6">{t('dashboard')}</h1>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label={t('inStock')} value={d.stock.in_stock} color="green" />
         <StatCard label={t('inTransit')} value={d.stock.in_transit} color="yellow" />

@@ -6,7 +6,7 @@ const { JWT_SECRET, authenticate, resolvePermission } = require('../middleware/a
 const router = express.Router();
 
 const ALL_PAGES = ['dashboard','warehouse','clients','preorders','sales','cash','settings','admin','client_portal',
-  'suppliers','finance','analytics','reports','import','employees','activity_log'];
+  'suppliers','finance','analytics','reports','import','employees','activity_log','scan','broadcast'];
 
 async function buildPermissionsMap(userId, role) {
   const map = {};

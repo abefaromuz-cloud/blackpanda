@@ -31,7 +31,7 @@ export default function Suppliers() {
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
-        <h1 className="text-xl font-black">{t('suppliers')}</h1>
+        <h1 className="text-2xl font-black">{t('suppliers')}</h1>
         {canEdit && <button className="btn btn-primary" onClick={() => setShowForm(s => !s)}>{t('addSupplier')}</button>}
       </div>
 

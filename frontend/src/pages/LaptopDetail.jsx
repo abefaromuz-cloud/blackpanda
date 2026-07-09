@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import { printSerialLabel } from '../utils/print';
 
 const statusKey = { s1: ['inTransit', 'badge-yellow'], s2: ['inStock', 'badge-green'], s15: ['reserved', 'badge-blue'], s3: ['soldTotal', 'badge-red'] };
 
@@ -64,7 +65,7 @@ export default function LaptopDetail() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
-                <th className="pb-2">S/N</th><th className="pb-2">Status</th><th className="pb-2">{t('date')}</th><th className="pb-2">Sale</th>
+                <th className="pb-2">S/N</th><th className="pb-2">Status</th><th className="pb-2">{t('date')}</th><th className="pb-2">Sale</th><th className="pb-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -76,6 +77,9 @@ export default function LaptopDetail() {
                     <td className="py-2"><span className={`badge ${cls}`}>{t(key)}</span></td>
                     <td className="py-2 text-text3">{s.arrival_date ? new Date(s.arrival_date).toLocaleDateString('ru-RU') : '—'}</td>
                     <td className="py-2 text-text3">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td className="py-2 text-right">
+                      <button className="text-text3 hover:text-accent2 text-xs" onClick={() => printSerialLabel({ serial: s.serial, brand: l.brand, series: l.series, specs: [l.cpu, l.ram, l.storage].filter(Boolean).join(' / '), arrivalDate: s.arrival_date })}>🏷️</button>
+                    </td>
                   </tr>
                 );
               })}

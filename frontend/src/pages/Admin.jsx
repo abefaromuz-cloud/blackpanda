@@ -5,7 +5,7 @@ import { roleLabels, pageLabels } from '../i18n/translations';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
-  'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log'];
+  'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast'];
 
 export default function Admin() {
   const { t, lang } = useLang();
@@ -13,7 +13,7 @@ export default function Admin() {
 
   return (
     <div>
-      <h1 className="text-xl font-black mb-5 flex items-center gap-2"><span className="text-purple">◇</span> {t('admin')}</h1>
+      <h1 className="text-2xl font-black mb-6 flex items-center gap-2"><span className="text-purple">◇</span> {t('admin')}</h1>
       <div className="flex gap-2 mb-5">
         <button onClick={() => setTab('users')} className={`btn ${tab === 'users' ? 'btn-primary' : 'btn-secondary'}`}>{t('users')}</button>
         <button onClick={() => setTab('permissions')} className={`btn ${tab === 'permissions' ? 'btn-primary' : 'btn-secondary'}`}>{t('permissions')}</button>

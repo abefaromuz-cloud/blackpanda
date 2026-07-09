@@ -24,11 +24,30 @@ router.put('/rate', authenticate, requirePermission('settings', 'edit'), async (
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
-router.get('/rate-history', authenticate, requirePermission('settings', 'view'), async (req, res) => {
+router.get('/public-rate', authenticate, async (req, res) => {
+  const result = await pool.query('SELECT rate FROM settings WHERE id=1');
+  res.json({ rate: Number(result.rows[0].rate) });
+});
+
+router.get('/rate-history', authenticate, async (req, res) => {
   try {
     const result = await pool.query('SELECT rate, created_at FROM rate_history ORDER BY created_at DESC LIMIT 90');
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
+// Курс ЦБ РФ — сам курс запрашивается из браузера (см. Analytics.jsx) и здесь только сохраняется,
+// чтобы история была общая для всех, а не в localStorage одного человека
+router.post('/cbr-rate', authenticate, async (req, res) => {
+  const { date, rate } = req.body;
+  if (!date || !rate) return res.status(400).json({ error: 'Укажите дату и курс' });
+  await pool.query('INSERT INTO cbr_rate_history (date, rate) VALUES ($1,$2) ON CONFLICT (date) DO UPDATE SET rate=$2', [date, rate]);
+  res.json({ success: true });
+});
+
+router.get('/cbr-rate-history', authenticate, async (req, res) => {
+  const result = await pool.query('SELECT date, rate FROM cbr_rate_history ORDER BY date DESC LIMIT 400');
+  res.json(result.rows);
 });
 
 // Telegram-токен хранится и используется только на сервере — не уходит в браузер
