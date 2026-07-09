@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS serials (
 );
 CREATE INDEX IF NOT EXISTS idx_serials_laptop ON serials(laptop_id);
 CREATE INDEX IF NOT EXISTS idx_serials_status ON serials(status_id);
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS warranty_notify BOOLEAN DEFAULT false;
 
 -- История статусов серийника (аналог history[] в старой версии)
 CREATE TABLE IF NOT EXISTS serial_history (
@@ -258,6 +259,8 @@ CREATE TABLE IF NOT EXISTS lib_brands (
   name TEXT UNIQUE NOT NULL,
   sort_order INT NOT NULL DEFAULT 100
 );
+ALTER TABLE lib_brands ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
+
 CREATE TABLE IF NOT EXISTS lib_series (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID NOT NULL REFERENCES lib_brands(id) ON DELETE CASCADE,
@@ -265,6 +268,7 @@ CREATE TABLE IF NOT EXISTS lib_series (
   sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(brand_id, name)
 );
+ALTER TABLE lib_series ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
 
 -- Справочник: плоские списки значений (CPU/GPU/RAM/накопитель/цвет/экран)
 CREATE TABLE IF NOT EXISTS lib_values (
@@ -274,6 +278,7 @@ CREATE TABLE IF NOT EXISTS lib_values (
   sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(category, value)
 );
+ALTER TABLE lib_values ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
 
 -- Порядок разделов в боковом меню (общий для всех, настраивается администратором)
 CREATE TABLE IF NOT EXISTS nav_order (
