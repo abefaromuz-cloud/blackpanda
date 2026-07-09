@@ -1,0 +1,91 @@
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { useLang } from '../i18n/LangContext';
+import { roleLabels } from '../i18n/translations';
+
+const navItems = [
+  { to: '/',          key: 'dashboard', page: 'dashboard', icon: '◈', end: true },
+  { to: '/warehouse', key: 'warehouse', page: 'warehouse', icon: '▣' },
+  { to: '/clients',   key: 'clients',   page: 'clients',   icon: '◐' },
+  { to: '/preorders', key: 'preorders', page: 'preorders', icon: '▤' },
+  { to: '/sales',     key: 'sales',     page: 'sales',     icon: '◆' },
+  { to: '/cash',      key: 'cash',      page: 'cash',      icon: '●' },
+  { to: '/suppliers', key: 'suppliers', page: 'suppliers', icon: '▥' },
+  { to: '/finance',   key: 'finance',   page: 'finance',   icon: '▮' },
+  { to: '/analytics', key: 'analytics', page: 'analytics', icon: '◈' },
+  { to: '/reports',   key: 'reports',   page: 'reports',   icon: '▦' },
+  { to: '/import',    key: 'importPage',page: 'import',    icon: '⇩' },
+  { to: '/employees', key: 'employees', page: 'employees', icon: '◐' },
+  { to: '/activity-log', key: 'activityLog', page: 'activity_log', icon: '▤' },
+  { to: '/settings',  key: 'settings',  page: 'settings',  icon: '⚙' },
+];
+
+export default function Layout() {
+  const navigate = useNavigate();
+  const { user, can, logout } = useAuth();
+  const { t, lang, setLang } = useLang();
+
+  const visibleItems = navItems.filter(i => can(i.page, 'view'));
+
+  return (
+    <div className="flex min-h-screen bg-bg">
+      <aside className="w-60 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0">
+        <div className="p-5 border-b border-border flex items-center gap-2.5">
+          <img src="/panda-logo-icon.png" alt="" className="w-9 h-9 rounded-lg object-contain bg-bg3 border border-border p-0.5 flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg font-black leading-none tracking-tight truncate">BlackPanda</h1>
+            <p className="text-[10px] text-accent2 mt-1 font-semibold tracking-widest uppercase">CRM</p>
+          </div>
+        </div>
+        <nav className="flex-1 p-2.5 space-y-0.5 overflow-y-auto min-h-0">
+          {visibleItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${
+                  isActive ? 'bg-accent text-white font-semibold shadow-lg shadow-accent/20' : 'text-text2 hover:bg-bg3 hover:text-text'
+                }`
+              }
+            >
+              <span className="text-base w-4 text-center opacity-80">{item.icon}</span>
+              <span>{t(item.key)}</span>
+            </NavLink>
+          ))}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition mt-2 border-t border-border pt-3.5 ${
+                isActive ? 'text-accent2 font-semibold' : 'text-purple hover:text-purple'
+              }`}>
+              <span className="text-base w-4 text-center opacity-80">◇</span>
+              <span>{t('admin')}</span>
+            </NavLink>
+          )}
+        </nav>
+
+        {/* Иллюстрация — адаптивная, без фиксированной высоты, чтобы не резалась криво на разных экранах */}
+        <div className="relative shrink-0 border-t border-border overflow-hidden" style={{ aspectRatio: '250 / 300' }}>
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(225,29,46,0.10), transparent 70%)' }} />
+          <img src="/panda-logo-full.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
+            style={{ filter: 'drop-shadow(0 0 16px rgba(225,29,46,0.25))' }} />
+        </div>
+
+        <div className="p-3 border-t border-border">
+          <button onClick={() => setLang(lang === 'ru' ? 'zh' : 'ru')}
+            className="w-full mb-2 text-xs px-3 py-1.5 rounded-lg border border-border text-text2 hover:text-text hover:border-accent transition">
+            {lang === 'ru' ? '中文' : 'RU'}
+          </button>
+          <p className="text-xs font-medium text-text truncate">{user?.full_name}</p>
+          <p className="text-[10px] text-text3 mb-2">{roleLabels[lang]?.[user?.role] || user?.role}</p>
+          <button onClick={logout} className="w-full text-xs bg-bg3 hover:bg-bg4 rounded-lg py-1.5 transition">
+            {t('logout')}
+          </button>
+        </div>
+      </aside>
+      <main className="flex-1 p-6 overflow-y-auto min-w-0">
+        <Outlet />
+      </main>
+    </div>
+  );
+}

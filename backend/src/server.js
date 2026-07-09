@@ -1,0 +1,41 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'BlackPanda CRM API' }));
+app.use('/api/auth',      require('./routes/auth'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/laptops',   require('./routes/laptops'));
+app.use('/api/serials',   require('./routes/serials'));
+app.use('/api/clients',   require('./routes/clients'));
+app.use('/api/preorders', require('./routes/preorders'));
+app.use('/api/sales',     require('./routes/sales'));
+app.use('/api/cash',      require('./routes/cash'));
+app.use('/api/settings',  require('./routes/settings'));
+app.use('/api/admin',     require('./routes/admin'));
+app.use('/api/client-portal', require('./routes/clientPortal'));
+app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/employees', require('./routes/employees'));
+app.use('/api/finance',   require('./routes/finance'));
+app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/reports',   require('./routes/reports'));
+app.use('/api/import',    require('./routes/import'));
+app.use('/api/activity-log', require('./routes/activityLog'));
+
+// Раздача собранного фронтенда
+const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');
+app.use(express.static(DIST));
+app.get('*', (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+});
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`🐼 BlackPanda CRM запущен на порту ${PORT}`));

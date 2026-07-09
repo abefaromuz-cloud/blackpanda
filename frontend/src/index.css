@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+
+.card { @apply bg-bg2 border border-border rounded-2xl p-4 transition; }
+.card:hover { @apply border-border; }
+.btn { @apply inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition active:scale-[0.98]; }
+.btn-primary { @apply bg-accent text-white hover:bg-accent/90 shadow-glow; }
+.btn-secondary { @apply bg-bg3 border border-border text-text2 hover:text-text hover:border-accent/50; }
+.btn-danger { @apply bg-red/10 border border-red/40 text-red hover:bg-red hover:text-white; }
+.inp { @apply w-full px-3 py-2 bg-bg3 border border-border rounded-lg text-text text-sm focus:border-accent focus:ring-1 focus:ring-accent/30 outline-none transition; }
+.badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold; }
+.badge-blue { @apply bg-accent/15 text-accent2; }
+.badge-green { @apply bg-green/15 text-green; }
+.badge-red { @apply bg-red/15 text-red; }
+.badge-yellow { @apply bg-yellow/15 text-yellow; }
+.badge-purple { @apply bg-purple/15 text-purple; }
