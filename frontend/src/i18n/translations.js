@@ -52,7 +52,7 @@ export const translations = {
     scannedList: 'Отсканировано', chooseClientOpt: '— без клиента —', comment: 'Комментарий',
     library: 'Справочник', brandsAndSeries: 'Бренды и серии', addBrand: '+ Бренд', addSeries: '+ Серия',
     processors: 'Процессоры', gpus: 'Видеокарты', rams: 'Оперативная память', storages: 'Накопители',
-    colors: 'Цвета', screens: 'Экраны', addValue: '+ Добавить',
+    colors: 'Цвета', screens: 'Экраны', addValue: '+ Добавить', menuOrder: 'Порядок меню',
   },
   zh: {
     dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单',
@@ -107,7 +107,7 @@ export const translations = {
     scannedList: '已扫描', chooseClientOpt: '— 无客户 —', comment: '备注',
     library: '资料库', brandsAndSeries: '品牌与系列', addBrand: '+ 品牌', addSeries: '+ 系列',
     processors: '处理器', gpus: '显卡', rams: '内存', storages: '存储',
-    colors: '颜色', screens: '屏幕', addValue: '+ 添加',
+    colors: '颜色', screens: '屏幕', addValue: '+ 添加', menuOrder: '菜单顺序',
   }
 };
 

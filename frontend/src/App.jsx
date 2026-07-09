@@ -23,6 +23,7 @@ import ActivityLog from './pages/ActivityLog';
 import Scan from './pages/Scan';
 import Broadcast from './pages/Broadcast';
 import Library from './pages/Library';
+import SerialDetail from './pages/SerialDetail';
 import { useAuth } from './auth/AuthContext';
 import { useLang } from './i18n/LangContext';
 
@@ -63,6 +64,7 @@ export default function App() {
         <Route index element={<PermGuard page="dashboard"><Dashboard /></PermGuard>} />
         <Route path="warehouse" element={<PermGuard page="warehouse"><Warehouse /></PermGuard>} />
         <Route path="warehouse/:id" element={<PermGuard page="warehouse"><LaptopDetail /></PermGuard>} />
+        <Route path="serials/:id" element={<PermGuard page="warehouse"><SerialDetail /></PermGuard>} />
         <Route path="clients" element={<PermGuard page="clients"><Clients /></PermGuard>} />
         <Route path="clients/:id" element={<PermGuard page="clients"><ClientDetail /></PermGuard>} />
         <Route path="preorders" element={<PermGuard page="preorders"><Preorders /></PermGuard>} />

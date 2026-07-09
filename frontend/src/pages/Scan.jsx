@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { printReceipt } from '../utils/print';
+import { beep } from '../utils/sound';
 import { useLang } from '../i18n/LangContext';
 
 export default function Scan() {
@@ -52,11 +54,14 @@ export default function Scan() {
     try {
       const { data } = await api.get(`/serials/lookup/${encodeURIComponent(s)}`);
       if (data.status_id === 's2' || data.status_id === 's15') {
-        setScanned(a => [...a, { serial: s, status: 'ok', laptop_id: data.laptop_id, brand: data.brand, series: data.series }]);
+        beep(true);
+        setScanned(a => [...a, { serial: s, status: 'ok', id: data.id, laptop_id: data.laptop_id, brand: data.brand, series: data.series }]);
       } else {
-        setScanned(a => [...a, { serial: s, status: 'sold' }]);
+        beep(false);
+        setScanned(a => [...a, { serial: s, status: 'sold', id: data.id }]);
       }
     } catch {
+      beep(false);
       setScanned(a => [...a, { serial: s, status: 'notfound' }]);
     }
     setScanInput('');
@@ -161,7 +166,11 @@ export default function Scan() {
             <div className="max-h-64 overflow-y-auto mb-3">
               {scanned.map((s, i) => (
                 <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg mb-1 text-sm ${s.status === 'ok' ? 'bg-green/10 border border-green' : s.status === 'sold' ? 'bg-yellow/10 border border-yellow' : 'bg-red/10 border border-red'}`}>
-                  <span className="font-mono">{s.serial}</span>
+                  {s.id ? (
+                    <Link to={`/serials/${s.id}`} target="_blank" className="font-mono hover:underline hover:text-accent2" title="Открыть карточку / историю серийника">{s.serial}</Link>
+                  ) : (
+                    <span className="font-mono">{s.serial}</span>
+                  )}
                   <span className="text-xs">{s.status === 'ok' ? `${s.brand} ${s.series}` : s.status === 'sold' ? 'уже продан/недоступен' : t('notFound')}</span>
                   <button onClick={() => removeScanned(i)} className="text-text3 hover:text-red">✕</button>
                 </div>

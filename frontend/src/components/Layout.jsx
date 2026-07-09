@@ -1,7 +1,9 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels } from '../i18n/translations';
+import api from '../api/client';
 
 const navItems = [
   { to: '/',          key: 'dashboard', page: 'dashboard', icon: '◈', end: true },
@@ -27,8 +29,21 @@ export default function Layout() {
   const navigate = useNavigate();
   const { user, can, logout } = useAuth();
   const { t, lang, setLang } = useLang();
+  const [order, setOrder] = useState(null);
 
-  const visibleItems = navItems.filter(i => can(i.page, 'view'));
+  useEffect(() => { api.get('/nav-order').then(r => setOrder(r.data.map(o => o.page_key))); }, []);
+
+  const orderedItems = order
+    ? [...navItems].sort((a, b) => {
+        const ia = order.indexOf(a.page), ib = order.indexOf(b.page);
+        if (ia === -1 && ib === -1) return 0;
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      })
+    : navItems;
+
+  const visibleItems = orderedItems.filter(i => can(i.page, 'view'));
 
   return (
     <div className="flex min-h-screen bg-bg">

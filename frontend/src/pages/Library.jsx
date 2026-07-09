@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import DragReorderList from '../components/DragReorderList';
 
 const CATS = [
   ['cpu', 'processors'], ['gpu', 'gpus'], ['ram', 'rams'],
@@ -30,6 +31,10 @@ export default function Library() {
     if (!confirm('Удалить бренд и все его серии?')) return;
     await api.delete(`/library/brands/${id}`); load();
   }
+  async function reorderBrands(ids) {
+    await api.put('/library/brands/reorder', { ids });
+    load();
+  }
   async function addSeries(brandId) {
     const name = newSeries[brandId];
     if (!name?.trim()) return;
@@ -39,6 +44,10 @@ export default function Library() {
   async function delSeries(id) {
     await api.delete(`/library/series/${id}`); load();
   }
+  async function reorderSeries(ids) {
+    await api.put('/library/series/reorder', { ids });
+    load();
+  }
   async function addValue(cat) {
     const v = newValue[cat];
     if (!v?.trim()) return;
@@ -47,6 +56,10 @@ export default function Library() {
   }
   async function delValue(id) {
     await api.delete(`/library/values/${id}`); load();
+  }
+  async function reorderValues(ids) {
+    await api.put('/library/values/reorder', { ids });
+    load();
   }
 
   if (!data) return <div className="text-text3">{t('loading')}</div>;
@@ -65,20 +78,35 @@ export default function Library() {
             </form>
           )}
         </div>
-        <div className="space-y-3">
-          {data.brands.map(b => (
-            <div key={b.id} className="border-t border-border pt-2">
+
+        <DragReorderList
+          items={data.brands}
+          getKey={b => b.id}
+          onReorder={reorderBrands}
+          renderItem={(b, handleProps) => (
+            <div className="border-t border-border pt-2">
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-sm">{b.name}</span>
+                <span className="flex items-center gap-2 font-bold text-sm">
+                  {canEdit && <span {...handleProps} className="text-text3 select-none">⠿</span>}
+                  {b.name}
+                </span>
                 {canEdit && <button className="text-red text-xs hover:underline" onClick={() => delBrand(b.id)}>{t('delete')}</button>}
               </div>
-              <div className="pl-3 space-y-1">
-                {b.series.map(s => (
-                  <div key={s.id} className="flex justify-between items-center text-xs text-text2">
-                    <span>{s.name}</span>
-                    {canEdit && <button className="text-text3 hover:text-red" onClick={() => delSeries(s.id)}>✕</button>}
-                  </div>
-                ))}
+              <div className="pl-3">
+                <DragReorderList
+                  items={b.series}
+                  getKey={s => s.id}
+                  onReorder={reorderSeries}
+                  renderItem={(s, seriesHandle) => (
+                    <div className="flex justify-between items-center text-xs text-text2 py-0.5">
+                      <span className="flex items-center gap-2">
+                        {canEdit && <span {...seriesHandle} className="text-text3 select-none">⠿</span>}
+                        {s.name}
+                      </span>
+                      {canEdit && <button className="text-text3 hover:text-red" onClick={() => delSeries(s.id)}>✕</button>}
+                    </div>
+                  )}
+                />
                 {canEdit && (
                   <div className="flex gap-2 mt-1">
                     <input className="inp inp-sm flex-1" placeholder={t('addSeries')} value={newSeries[b.id] || ''}
@@ -89,8 +117,8 @@ export default function Library() {
                 )}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -98,12 +126,20 @@ export default function Library() {
           <div key={cat} className="card">
             <div className="font-bold text-sm mb-3">{t(labelKey)}</div>
             <div className="max-h-56 overflow-y-auto mb-2">
-              {(data.values[cat] || []).map(v => (
-                <div key={v.id} className="flex justify-between items-center text-sm py-1 border-b border-border last:border-0">
-                  <span>{v.value}</span>
-                  {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delValue(v.id)}>✕</button>}
-                </div>
-              ))}
+              <DragReorderList
+                items={data.values[cat] || []}
+                getKey={v => v.id}
+                onReorder={(ids) => reorderValues(ids)}
+                renderItem={(v, handleProps) => (
+                  <div className="flex justify-between items-center text-sm py-1 border-b border-border last:border-0">
+                    <span className="flex items-center gap-2">
+                      {canEdit && <span {...handleProps} className="text-text3 select-none">⠿</span>}
+                      {v.value}
+                    </span>
+                    {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delValue(v.id)}>✕</button>}
+                  </div>
+                )}
+              />
               {!(data.values[cat] || []).length && <div className="text-text3 text-xs">—</div>}
             </div>
             {canEdit && (

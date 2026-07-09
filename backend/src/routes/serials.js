@@ -15,6 +15,23 @@ router.get('/lookup/:serial', authenticate, requirePermission('warehouse', 'view
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Полная карточка серийника: спецификации, история, последний связанный клиент
+router.get('/detail/:id', authenticate, requirePermission('warehouse', 'view'), async (req, res) => {
+  try {
+    const [s, history] = await Promise.all([
+      pool.query(`
+        SELECT s.*, l.brand, l.series, l.cpu, l.ram, l.gpu, l.storage, l.color, l.screen, c.name AS client_name
+        FROM serials s JOIN laptops l ON l.id = s.laptop_id
+        LEFT JOIN clients c ON c.id = s.sale_client_id
+        WHERE s.id=$1
+      `, [req.params.id]),
+      pool.query('SELECT * FROM serial_history WHERE serial_id=$1 ORDER BY created_at DESC', [req.params.id]),
+    ]);
+    if (!s.rows[0]) return res.status(404).json({ error: 'Серийник не найден' });
+    res.json({ ...s.rows[0], history: history.rows });
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
 // Добавить один серийник на склад (приход товара)
 router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
   const { laptop_id, serial, status_id, warranty_months, notes } = req.body;
@@ -63,19 +80,33 @@ router.post('/bulk', authenticate, requirePermission('warehouse', 'edit'), async
 });
 
 router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
-  const { status_id, notes, warranty_months } = req.body;
+  const { status_id, notes, warranty_months, warranty_notify, arrival_date, sale_date, history_note } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE serials SET status_id=COALESCE($1,status_id), notes=COALESCE($2,notes), warranty_months=COALESCE($3,warranty_months)
-       WHERE id=$4 RETURNING *`,
-      [status_id||null, notes ?? null, warranty_months||null, req.params.id]
+      `UPDATE serials SET status_id=COALESCE($1,status_id), notes=COALESCE($2,notes), warranty_months=COALESCE($3,warranty_months),
+        warranty_notify=COALESCE($4,warranty_notify), arrival_date=COALESCE($5,arrival_date), sale_date=COALESCE($6,sale_date)
+       WHERE id=$7 RETURNING *`,
+      [status_id||null, notes ?? null, warranty_months||null, warranty_notify ?? null, arrival_date||null, sale_date||null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Не найден' });
     if (status_id) {
       await pool.query('INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,$3)',
-        [req.params.id, status_id, 'Статус изменён вручную']);
+        [req.params.id, status_id, history_note || 'Статус изменён вручную']);
     }
     res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
+// Оформить возврат: серийник возвращается на склад, в истории фиксируется от кого и по какой причине
+router.post('/:id/return', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
+  const { reason } = req.body;
+  try {
+    const sr = await pool.query('SELECT s.*, c.name AS client_name FROM serials s LEFT JOIN clients c ON c.id=s.sale_client_id WHERE s.id=$1', [req.params.id]);
+    if (!sr.rows[0]) return res.status(404).json({ error: 'Не найден' });
+    await pool.query(`UPDATE serials SET status_id='s2' WHERE id=$1`, [req.params.id]);
+    const note = `Возврат${sr.rows[0].client_name ? ' от клиента ' + sr.rows[0].client_name : ''}${reason ? ': ' + reason : ''}`;
+    await pool.query('INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,\'s2\',$2)', [req.params.id, note]);
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 

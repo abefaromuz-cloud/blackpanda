@@ -208,7 +208,7 @@ export default function LaptopDetail() {
                   <td className="py-2">
                     {s.status_id === 's2' && <input type="checkbox" checked={selected.includes(s.serial)} onChange={() => toggleSelect(s.serial)} />}
                   </td>
-                  <td className="py-2 font-mono">{s.serial}</td>
+                  <td className="py-2 font-mono"><Link to={`/serials/${s.id}`} className="hover:text-accent2 hover:underline">{s.serial}</Link></td>
                   <td className="py-2">
                     {canEdit ? (
                       <select className="inp text-xs py-1" value={s.status_id} onChange={e => changeStatus(s.id, e.target.value)}>

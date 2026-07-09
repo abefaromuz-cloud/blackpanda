@@ -31,6 +31,7 @@ app.use('/api/bank-accounts', require('./routes/bankAccounts'));
 app.use('/api/msg-templates', require('./routes/msgTemplates'));
 app.use('/api/broadcast', require('./routes/broadcast'));
 app.use('/api/library', require('./routes/library'));
+app.use('/api/nav-order', require('./routes/navOrder'));
 
 // Раздача собранного фронтенда
 const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');

@@ -88,7 +88,10 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
       );
       for (const sr of ri.sers) {
         await client.query(`UPDATE serials SET status_id='s3', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [client_id || null, sr.id]);
-        await client.query(`INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3','Продан')`, [sr.id]);
+        await client.query(
+          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3',$2)`,
+          [sr.id, 'Продан' + (client_id ? ' клиенту ' + (cl?.name || '') : '')]
+        );
         // Если серийник был зарезервирован — закрываем резерв
         await client.query(`UPDATE reservations SET active=false WHERE serial_id=$1 AND active=true`, [sr.id]);
       }

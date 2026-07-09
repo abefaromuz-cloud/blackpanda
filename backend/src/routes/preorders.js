@@ -128,7 +128,10 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
       );
       for (const ser of serials) {
         await client.query(`UPDATE serials SET status_id='s3', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [po.client_id, ser.id]);
-        await client.query(`INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3','Передан клиенту')`, [ser.id]);
+        await client.query(
+          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3',$2)`,
+          [ser.id, 'Передан клиенту ' + ((await client.query('SELECT name FROM clients WHERE id=$1', [po.client_id])).rows[0]?.name || '')]
+        );
       }
       if (qty >= poItem.qty) {
         await client.query(`UPDATE preorder_items SET item_status='transferred' WHERE id=$1`, [poItem.id]);

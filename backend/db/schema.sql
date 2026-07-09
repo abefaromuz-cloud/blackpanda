@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS serials (
   sale_date TIMESTAMPTZ,
   sale_client_id UUID REFERENCES clients(id),
   warranty_months INT DEFAULT 3,
+  warranty_notify BOOLEAN DEFAULT false,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -254,12 +255,14 @@ ALTER TABLE laptops ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
 -- Справочник: бренды и их серии
 CREATE TABLE IF NOT EXISTS lib_brands (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT UNIQUE NOT NULL
+  name TEXT UNIQUE NOT NULL,
+  sort_order INT NOT NULL DEFAULT 100
 );
 CREATE TABLE IF NOT EXISTS lib_series (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID NOT NULL REFERENCES lib_brands(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(brand_id, name)
 );
 
@@ -268,21 +271,31 @@ CREATE TABLE IF NOT EXISTS lib_values (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category TEXT NOT NULL, -- cpu | gpu | ram | storage | color | screen
   value TEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(category, value)
 );
 
+-- Порядок разделов в боковом меню (общий для всех, настраивается администратором)
+CREATE TABLE IF NOT EXISTS nav_order (
+  page_key TEXT PRIMARY KEY,
+  sort_order INT NOT NULL
+);
+
 -- Стартовый набор, чтобы список не был пустым — дальше пополняется вручную в разделе «Справочник»
-INSERT INTO lib_brands (name) VALUES
-  ('Lenovo'),('HP'),('Dell'),('Asus'),('Acer'),('Apple'),('MSI'),('Huawei'),('Xiaomi'),('Samsung')
+INSERT INTO lib_brands (name, sort_order) VALUES
+  ('Acer',100),('Apple',200),('Asus',300),('Dell',400),('HP',500),
+  ('Huawei',600),('Lenovo',700),('MSI',800),('Samsung',900),('Xiaomi',1000)
 ON CONFLICT (name) DO NOTHING;
-INSERT INTO lib_values (category, value) VALUES
-  ('cpu','Intel Core i5-1240P'),('cpu','Intel Core i7-12700H'),('cpu','Intel Core i5-13500H'),
-  ('cpu','Ryzen 5 5600H'),('cpu','Ryzen 7 7840HS'),('cpu','Apple M2'),('cpu','Apple M3'),
-  ('gpu','Intel UHD Graphics'),('gpu','Intel Iris Xe'),('gpu','GeForce RTX 3050'),('gpu','GeForce RTX 4060'),('gpu','Radeon 680M'),
-  ('ram','8 GB'),('ram','16 GB'),('ram','32 GB'),('ram','64 GB'),
-  ('storage','256 GB SSD'),('storage','512 GB SSD'),('storage','1 TB SSD'),('storage','2 TB SSD'),
-  ('color','Чёрный'),('color','Серебристый'),('color','Серый'),('color','Синий'),
-  ('screen','13.3"'),('screen','14"'),('screen','15.6"'),('screen','16"'),('screen','17.3"')
+INSERT INTO lib_values (category, value, sort_order) VALUES
+  ('cpu','Apple M2',100),('cpu','Apple M3',200),('cpu','Intel Core i5-1240P',300),
+  ('cpu','Intel Core i5-13500H',400),('cpu','Intel Core i7-12700H',500),
+  ('cpu','Ryzen 5 5600H',600),('cpu','Ryzen 7 7840HS',700),
+  ('gpu','GeForce RTX 3050',100),('gpu','GeForce RTX 4060',200),('gpu','Intel Iris Xe',300),
+  ('gpu','Intel UHD Graphics',400),('gpu','Radeon 680M',500),
+  ('ram','16 GB',200),('ram','32 GB',300),('ram','64 GB',400),('ram','8 GB',100),
+  ('storage','1 TB SSD',300),('storage','2 TB SSD',400),('storage','256 GB SSD',100),('storage','512 GB SSD',200),
+  ('color','Синий',400),('color','Серебристый',200),('color','Серый',300),('color','Чёрный',100),
+  ('screen','13.3"',100),('screen','14"',200),('screen','15.6"',300),('screen','16"',400),('screen','17.3"',500)
 ON CONFLICT (category, value) DO NOTHING;
 
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);

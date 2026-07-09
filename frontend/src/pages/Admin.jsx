@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import api from '../api/client';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels, pageLabels } from '../i18n/translations';
+import DragReorderList from '../components/DragReorderList';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
   'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library'];
+const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preorders', 'sales', 'cash', 'suppliers',
+  'finance', 'analytics', 'reports', 'broadcast', 'import', 'employees', 'activity_log', 'settings'];
 
 export default function Admin() {
   const { t, lang } = useLang();
@@ -17,8 +20,48 @@ export default function Admin() {
       <div className="flex gap-2 mb-5">
         <button onClick={() => setTab('users')} className={`btn ${tab === 'users' ? 'btn-primary' : 'btn-secondary'}`}>{t('users')}</button>
         <button onClick={() => setTab('permissions')} className={`btn ${tab === 'permissions' ? 'btn-primary' : 'btn-secondary'}`}>{t('permissions')}</button>
+        <button onClick={() => setTab('navorder')} className={`btn ${tab === 'navorder' ? 'btn-primary' : 'btn-secondary'}`}>{t('menuOrder')}</button>
       </div>
-      {tab === 'users' ? <UsersTab /> : <PermissionsTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'permissions' ? <PermissionsTab /> : <NavOrderTab />}
+    </div>
+  );
+}
+
+function NavOrderTab() {
+  const { t, lang } = useLang();
+  const [order, setOrder] = useState(null);
+
+  function load() {
+    api.get('/nav-order').then(r => {
+      const saved = r.data.map(o => o.page_key);
+      const full = [...saved, ...NAV_PAGES.filter(p => !saved.includes(p))];
+      setOrder(full.map(p => ({ page: p })));
+    });
+  }
+  useEffect(load, []);
+
+  async function reorder(keys) {
+    setOrder(keys.map(p => ({ page: p })));
+    await api.put('/nav-order', { page_keys: keys });
+  }
+
+  if (!order) return <div className="text-text3">{t('loading')}</div>;
+
+  return (
+    <div className="card max-w-md">
+      <div className="font-bold text-sm mb-1">{t('menuOrder')}</div>
+      <div className="text-xs text-text3 mb-3">Перетащи разделы, чтобы изменить порядок в меню — для всех пользователей сразу.</div>
+      <DragReorderList
+        items={order}
+        getKey={o => o.page}
+        onReorder={reorder}
+        renderItem={(o, handleProps) => (
+          <div className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+            <span {...handleProps} className="text-text3 select-none text-lg">⠿</span>
+            <span className="text-sm">{pageLabels[lang]?.[o.page] || o.page}</span>
+          </div>
+        )}
+      />
     </div>
   );
 }
