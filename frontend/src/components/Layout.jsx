@@ -7,6 +7,7 @@ const navItems = [
   { to: '/',          key: 'dashboard', page: 'dashboard', icon: '◈', end: true },
   { to: '/scan',      key: 'scan',      page: 'scan',      icon: '▧' },
   { to: '/warehouse', key: 'warehouse', page: 'warehouse', icon: '▣' },
+  { to: '/library',   key: 'library',   page: 'library',   icon: '📚' },
   { to: '/clients',   key: 'clients',   page: 'clients',   icon: '◐' },
   { to: '/preorders', key: 'preorders', page: 'preorders', icon: '▤' },
   { to: '/sales',     key: 'sales',     page: 'sales',     icon: '◆' },

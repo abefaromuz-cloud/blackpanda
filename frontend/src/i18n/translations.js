@@ -50,6 +50,9 @@ export const translations = {
     ratechart: 'Курс: свой vs ЦБ РФ', myRate: 'Мой курс', cbrRate: 'Курс ЦБ РФ', updateCbr: 'Обновить курс ЦБ',
     period7: '7д', period30: '30д', period365: '1г', periodYears: 'Годы',
     scannedList: 'Отсканировано', chooseClientOpt: '— без клиента —', comment: 'Комментарий',
+    library: 'Справочник', brandsAndSeries: 'Бренды и серии', addBrand: '+ Бренд', addSeries: '+ Серия',
+    processors: 'Процессоры', gpus: 'Видеокарты', rams: 'Оперативная память', storages: 'Накопители',
+    colors: 'Цвета', screens: 'Экраны', addValue: '+ Добавить',
   },
   zh: {
     dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单',
@@ -102,6 +105,9 @@ export const translations = {
     ratechart: '汇率：自有 vs 央行', myRate: '我的汇率', cbrRate: '央行汇率', updateCbr: '更新央行汇率',
     period7: '7天', period30: '30天', period365: '1年', periodYears: '按年',
     scannedList: '已扫描', chooseClientOpt: '— 无客户 —', comment: '备注',
+    library: '资料库', brandsAndSeries: '品牌与系列', addBrand: '+ 品牌', addSeries: '+ 系列',
+    processors: '处理器', gpus: '显卡', rams: '内存', storages: '存储',
+    colors: '颜色', screens: '屏幕', addValue: '+ 添加',
   }
 };
 
@@ -112,7 +118,7 @@ export const roleLabels = {
 
 export const pageLabels = {
   ru: { dashboard: 'Дашборд', warehouse: 'Склад', clients: 'Клиенты', preorders: 'Предзаказы', sales: 'Продажи', cash: 'Касса', settings: 'Настройки', admin: 'Админ-панель', client_portal: 'Портал клиента',
-    suppliers: 'Поставщики', finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', import: 'Импорт', employees: 'Сотрудники', activity_log: 'Журнал действий', scan: 'Сканер', broadcast: 'Рассылка' },
+    suppliers: 'Поставщики', finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', import: 'Импорт', employees: 'Сотрудники', activity_log: 'Журнал действий', scan: 'Сканер', broadcast: 'Рассылка', library: 'Справочник' },
   zh: { dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单', sales: '销售', cash: '收银', settings: '设置', admin: '管理面板', client_portal: '客户门户',
-    suppliers: '供应商', finance: '财务', analytics: '分析', reports: '报表', import: '导入', employees: '员工', activity_log: '操作日志', scan: '扫描', broadcast: '群发' },
+    suppliers: '供应商', finance: '财务', analytics: '分析', reports: '报表', import: '导入', employees: '员工', activity_log: '操作日志', scan: '扫描', broadcast: '群发', library: '资料库' },
 };

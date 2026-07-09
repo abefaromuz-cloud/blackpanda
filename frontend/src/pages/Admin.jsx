@@ -5,7 +5,7 @@ import { roleLabels, pageLabels } from '../i18n/translations';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
-  'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast'];
+  'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library'];
 
 export default function Admin() {
   const { t, lang } = useLang();

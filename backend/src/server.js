@@ -30,6 +30,7 @@ app.use('/api/reservations', require('./routes/reservations'));
 app.use('/api/bank-accounts', require('./routes/bankAccounts'));
 app.use('/api/msg-templates', require('./routes/msgTemplates'));
 app.use('/api/broadcast', require('./routes/broadcast'));
+app.use('/api/library', require('./routes/library'));
 
 // Раздача собранного фронтенда
 const DIST = path.join(__dirname, '..', '..', 'frontend', 'dist');

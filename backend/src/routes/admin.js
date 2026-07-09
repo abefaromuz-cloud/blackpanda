@@ -10,7 +10,7 @@ const router = express.Router();
 router.use(authenticate, requireRole('admin'));
 
 const PAGES = ['dashboard','warehouse','clients','preorders','sales','cash','settings','admin','client_portal',
-  'suppliers','finance','analytics','reports','import','employees','activity_log','scan','broadcast'];
+  'suppliers','finance','analytics','reports','import','employees','activity_log','scan','broadcast','library'];
 const ROLES = ['admin','staff','accountant','client'];
 
 // ---------- Пользователи ----------

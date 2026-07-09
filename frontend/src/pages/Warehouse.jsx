@@ -15,6 +15,7 @@ export default function Warehouse() {
   const [laptops, setLaptops] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [rate, setRate] = useState(0);
+  const [lib, setLib] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState('');
@@ -28,12 +29,23 @@ export default function Warehouse() {
     api.get('/laptops').then(r => setLaptops(r.data));
     api.get('/reservations').then(r => setReservations(r.data));
     api.get('/settings/public-rate').then(r => setRate(r.data.rate));
+    api.get('/library').then(r => setLib(r.data));
   }
   useEffect(load, []);
 
   async function submit(e) {
     e.preventDefault();
     await api.post('/laptops', { ...form, images: form.images.filter(Boolean) });
+    // Автосохранение новых значений в справочник, чтобы в следующий раз можно было выбрать из списка
+    const brandInLib = lib?.brands.some(b => b.name === form.brand);
+    if (!brandInLib || form.series) {
+      await api.post('/library/quick-add', { category: 'brand_series', brand_name: form.brand, series_name: form.series });
+    }
+    for (const [cat, val] of [['cpu', form.cpu], ['gpu', form.gpu], ['ram', form.ram], ['storage', form.storage], ['color', form.color], ['screen', form.screen]]) {
+      if (val && !(lib?.values[cat] || []).some(v => v.value === val)) {
+        await api.post('/library/quick-add', { category: cat, value: val });
+      }
+    }
     setForm(emptyForm); setShowForm(false); load();
   }
 
@@ -48,11 +60,25 @@ export default function Warehouse() {
     load();
   }
 
-  const opts = useMemo(() => ({
-    brand: uniq(laptops.map(l => l.brand)), cpu: uniq(laptops.map(l => l.cpu)), ram: uniq(laptops.map(l => l.ram)),
-    gpu: uniq(laptops.map(l => l.gpu)), storage: uniq(laptops.map(l => l.storage)), color: uniq(laptops.map(l => l.color)),
-    screen: uniq(laptops.map(l => l.screen)),
-  }), [laptops]);
+  const opts = useMemo(() => {
+    if (lib) {
+      return {
+        brand: lib.brands.map(b => b.name),
+        cpu: lib.values.cpu.map(v => v.value), ram: lib.values.ram.map(v => v.value),
+        gpu: lib.values.gpu.map(v => v.value), storage: lib.values.storage.map(v => v.value),
+        color: lib.values.color.map(v => v.value), screen: lib.values.screen.map(v => v.value),
+      };
+    }
+    return { brand: uniq(laptops.map(l => l.brand)), cpu: uniq(laptops.map(l => l.cpu)), ram: uniq(laptops.map(l => l.ram)),
+      gpu: uniq(laptops.map(l => l.gpu)), storage: uniq(laptops.map(l => l.storage)), color: uniq(laptops.map(l => l.color)),
+      screen: uniq(laptops.map(l => l.screen)) };
+  }, [laptops, lib]);
+
+  const seriesOpts = useMemo(() => {
+    if (!lib || !form.brand) return [];
+    const b = lib.brands.find(x => x.name === form.brand);
+    return b ? b.series.map(s => s.name) : [];
+  }, [lib, form.brand]);
 
   const filtered = useMemo(() => {
     let list = laptops.filter(l => {
@@ -136,7 +162,8 @@ export default function Warehouse() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
             <input className="inp" placeholder={t('name') + ' (бренд)'} list="brand-list" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} required />
             <datalist id="brand-list">{opts.brand.map(b => <option key={b} value={b} />)}</datalist>
-            <input className="inp" placeholder="Серия" value={form.series} onChange={e => setForm(f => ({ ...f, series: e.target.value }))} />
+            <input className="inp" placeholder="Серия" list="series-list" value={form.series} onChange={e => setForm(f => ({ ...f, series: e.target.value }))} />
+            <datalist id="series-list">{seriesOpts.map(v => <option key={v} value={v} />)}</datalist>
             <input className="inp" placeholder="CPU" list="cpu-list" value={form.cpu} onChange={e => setForm(f => ({ ...f, cpu: e.target.value }))} />
             <datalist id="cpu-list">{opts.cpu.map(v => <option key={v} value={v} />)}</datalist>
             <input className="inp" placeholder="RAM" list="ram-list" value={form.ram} onChange={e => setForm(f => ({ ...f, ram: e.target.value }))} />

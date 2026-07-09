@@ -51,6 +51,7 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('staff','activity_log',false,false),
   ('staff','scan',true,true),
   ('staff','broadcast',true,true),
+  ('staff','library',true,true),
   ('accountant','dashboard',true,false),
   ('accountant','warehouse',true,false),
   ('accountant','clients',true,false),
@@ -68,6 +69,7 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('accountant','activity_log',true,false),
   ('accountant','scan',false,false),
   ('accountant','broadcast',false,false),
+  ('accountant','library',false,false),
   ('client','client_portal',true,false)
 ON CONFLICT (role, page_key) DO NOTHING;
 
@@ -248,6 +250,40 @@ CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC)
 
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS is_hot BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
+
+-- Справочник: бренды и их серии
+CREATE TABLE IF NOT EXISTS lib_brands (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT UNIQUE NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lib_series (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  brand_id UUID NOT NULL REFERENCES lib_brands(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  UNIQUE(brand_id, name)
+);
+
+-- Справочник: плоские списки значений (CPU/GPU/RAM/накопитель/цвет/экран)
+CREATE TABLE IF NOT EXISTS lib_values (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL, -- cpu | gpu | ram | storage | color | screen
+  value TEXT NOT NULL,
+  UNIQUE(category, value)
+);
+
+-- Стартовый набор, чтобы список не был пустым — дальше пополняется вручную в разделе «Справочник»
+INSERT INTO lib_brands (name) VALUES
+  ('Lenovo'),('HP'),('Dell'),('Asus'),('Acer'),('Apple'),('MSI'),('Huawei'),('Xiaomi'),('Samsung')
+ON CONFLICT (name) DO NOTHING;
+INSERT INTO lib_values (category, value) VALUES
+  ('cpu','Intel Core i5-1240P'),('cpu','Intel Core i7-12700H'),('cpu','Intel Core i5-13500H'),
+  ('cpu','Ryzen 5 5600H'),('cpu','Ryzen 7 7840HS'),('cpu','Apple M2'),('cpu','Apple M3'),
+  ('gpu','Intel UHD Graphics'),('gpu','Intel Iris Xe'),('gpu','GeForce RTX 3050'),('gpu','GeForce RTX 4060'),('gpu','Radeon 680M'),
+  ('ram','8 GB'),('ram','16 GB'),('ram','32 GB'),('ram','64 GB'),
+  ('storage','256 GB SSD'),('storage','512 GB SSD'),('storage','1 TB SSD'),('storage','2 TB SSD'),
+  ('color','Чёрный'),('color','Серебристый'),('color','Серый'),('color','Синий'),
+  ('screen','13.3"'),('screen','14"'),('screen','15.6"'),('screen','16"'),('screen','17.3"')
+ON CONFLICT (category, value) DO NOTHING;
 
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other';
