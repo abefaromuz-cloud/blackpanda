@@ -32,6 +32,20 @@ export default function Scan() {
     api.get('/bank-accounts').then(r => setBanks(r.data));
   }, []);
 
+  // Предзаполнение из карточки модели (кнопка "Продать выбранные")
+  useEffect(() => {
+    const raw = sessionStorage.getItem('bp_scan_prefill');
+    if (raw) {
+      sessionStorage.removeItem('bp_scan_prefill');
+      try {
+        const sns = JSON.parse(raw);
+        sns.forEach(sn => addSerial(sn));
+        setStep(1);
+      } catch (e) {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function addSerial(sn) {
     const s = sn.trim();
     if (!s || scanned.some(x => x.serial === s)) { setScanInput(''); return; }

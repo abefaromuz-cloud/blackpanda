@@ -246,6 +246,9 @@ CREATE TABLE IF NOT EXISTS activity_log (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
 
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS is_hot BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
+
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other';
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS bank_key TEXT;
