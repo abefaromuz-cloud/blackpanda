@@ -9,10 +9,10 @@ router.get('/', authenticate, requirePermission('warehouse', 'view'), async (req
   try {
     const result = await pool.query(`
       SELECT l.*,
-        COUNT(s.id) FILTER (WHERE s.status_id='s2')  AS in_stock,
-        COUNT(s.id) FILTER (WHERE s.status_id='s1')  AS in_transit,
-        COUNT(s.id) FILTER (WHERE s.status_id='s15') AS reserved,
-        COUNT(s.id) FILTER (WHERE s.status_id='s3')  AS sold,
+        COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock'))    AS in_stock,
+        COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='intransit'))  AS in_transit,
+        COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='reserved'))   AS reserved,
+        COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold'))       AS sold,
         COUNT(s.id) AS total
       FROM laptops l
       LEFT JOIN serials s ON s.laptop_id = l.id

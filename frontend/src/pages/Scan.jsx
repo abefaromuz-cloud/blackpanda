@@ -53,7 +53,7 @@ export default function Scan() {
     if (!s || scanned.some(x => x.serial === s)) { setScanInput(''); return; }
     try {
       const { data } = await api.get(`/serials/lookup/${encodeURIComponent(s)}`);
-      if (data.status_id === 's2' || data.status_id === 's15') {
+      if (data.bucket === 'instock' || data.bucket === 'reserved') {
         beep(true);
         setScanned(a => [...a, { serial: s, status: 'ok', id: data.id, laptop_id: data.laptop_id, brand: data.brand, series: data.series }]);
       } else {

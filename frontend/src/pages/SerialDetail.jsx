@@ -4,18 +4,19 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { printSerialLabel } from '../utils/print';
-
-const statusOptions = [
-  ['s1', 'В пути'], ['s2', 'На складе'], ['s15', 'Резерв'], ['s3', 'Продан'],
-];
+import { useStatuses } from '../hooks/useStatuses';
+import { useLibraryText } from '../hooks/useLibraryText';
 
 export default function SerialDetail() {
   const { id } = useParams();
   const [s, setS] = useState(null);
   const [showReturn, setShowReturn] = useState(false);
   const [reason, setReason] = useState('');
+  const [newStatus, setNewStatus] = useState('');
   const { can } = useAuth();
   const { t } = useLang();
+  const { statuses, badgeClass, bucketOf, displayLabel } = useStatuses();
+  const { tr } = useLibraryText();
   const canEdit = can('warehouse', 'edit');
 
   function load() { api.get(`/serials/detail/${id}`).then(r => setS(r.data)); }
@@ -31,15 +32,24 @@ export default function SerialDetail() {
     load();
   }
 
+  function openReturn() {
+    // Разумные варианты по умолчанию после возврата — сотрудник может выбрать любой другой
+    const preferred = statuses.find(st => st.label === 'Склад (восст.)') || statuses.find(st => st.counts_as === 'instock');
+    setNewStatus(preferred?.label || '');
+    setShowReturn(true);
+  }
+
   async function doReturn(e) {
     e.preventDefault();
-    await api.post(`/serials/${id}/return`, { reason });
+    if (!newStatus) return;
+    await api.post(`/serials/${id}/return`, { reason, new_status: newStatus });
     setShowReturn(false); setReason(''); load();
   }
 
   if (!s) return <div className="text-text3">{t('loading')}</div>;
 
   const daysOnStock = s.arrival_date ? Math.floor((Date.now() - new Date(s.arrival_date)) / 86400000) : null;
+  const isSold = bucketOf(s.status_id) === 'sold';
 
   return (
     <div>
@@ -49,27 +59,32 @@ export default function SerialDetail() {
         <div className="flex justify-between items-start flex-wrap gap-2 mb-1">
           <div>
             <div className="font-mono text-xl font-black">{s.serial}</div>
-            <div className="text-text3 text-sm">{s.brand} · {s.series}</div>
+            <div className="text-text3 text-sm">{tr('brand', s.brand)} · {tr('series', s.series)}</div>
           </div>
           <div className="flex gap-2">
             <button className="btn btn-secondary btn-sm" onClick={() => printSerialLabel({ serial: s.serial, brand: s.brand, series: s.series, specs: [s.cpu, s.ram, s.storage].filter(Boolean).join(' / '), arrivalDate: s.arrival_date })}>🏷️ {t('printLabel')}</button>
-            {canEdit && s.status_id === 's3' && <button className="btn btn-danger btn-sm" onClick={() => setShowReturn(true)}>↩️ Возврат</button>}
+            {canEdit && isSold && <button className="btn btn-danger btn-sm" onClick={openReturn}>↩️ Возврат</button>}
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mt-3">
-          <div><div className="text-xs text-text3">CPU</div><div className="font-bold">{s.cpu || '—'}</div></div>
-          <div><div className="text-xs text-text3">RAM</div><div className="font-bold">{s.ram || '—'}</div></div>
-          <div><div className="text-xs text-text3">GPU</div><div className="font-bold">{s.gpu || '—'}</div></div>
-          <div><div className="text-xs text-text3">Накопитель</div><div className="font-bold">{s.storage || '—'}</div></div>
-          <div><div className="text-xs text-text3">Цвет</div><div className="font-bold">{s.color || '—'}</div></div>
-          <div><div className="text-xs text-text3">Экран</div><div className="font-bold">{s.screen || '—'}</div></div>
+          <div><div className="text-xs text-text3">CPU</div><div className="font-bold">{tr('cpu', s.cpu) || '—'}</div></div>
+          <div><div className="text-xs text-text3">RAM</div><div className="font-bold">{tr('ram', s.ram) || '—'}</div></div>
+          <div><div className="text-xs text-text3">GPU</div><div className="font-bold">{tr('gpu', s.gpu) || '—'}</div></div>
+          <div><div className="text-xs text-text3">Накопитель</div><div className="font-bold">{tr('storage', s.storage) || '—'}</div></div>
+          <div><div className="text-xs text-text3">Цвет</div><div className="font-bold">{tr('color', s.color) || '—'}</div></div>
+          <div><div className="text-xs text-text3">Экран</div><div className="font-bold">{tr('screen', s.screen) || '—'}</div></div>
         </div>
       </div>
 
       {showReturn && (
         <form onSubmit={doReturn} className="card mb-4">
           <div className="font-bold text-sm mb-2">Оформить возврат{s.client_name ? ` от клиента ${s.client_name}` : ''}</div>
-          <textarea className="inp mb-2" placeholder="Причина возврата" value={reason} onChange={e => setReason(e.target.value)} />
+          <textarea className="inp mb-3" placeholder="Причина возврата" value={reason} onChange={e => setReason(e.target.value)} />
+          <label className="block text-[11px] text-text2 font-bold uppercase mb-1">Какой статус присвоить после возврата</label>
+          <select className="inp mb-3" value={newStatus} onChange={e => setNewStatus(e.target.value)} required>
+            <option value="">— выбери статус —</option>
+            {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
+          </select>
           <div className="flex gap-2">
             <button type="button" className="btn btn-secondary" onClick={() => setShowReturn(false)}>{t('cancel')}</button>
             <button className="btn btn-primary">Подтвердить возврат</button>
@@ -82,9 +97,9 @@ export default function SerialDetail() {
           <div className="font-bold text-sm mb-3">Статус</div>
           {canEdit ? (
             <select className="inp mb-2" value={s.status_id} onChange={e => changeStatus(e.target.value)}>
-              {statusOptions.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
+              {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
             </select>
-          ) : <div className="text-sm">{statusOptions.find(o => o[0] === s.status_id)?.[1] || s.status_id}</div>}
+          ) : <div className="text-sm"><span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span></div>}
           {s.client_name && <div className="text-xs text-text3 mt-1">Клиент: {s.client_name}</div>}
 
           <div className="mt-3">

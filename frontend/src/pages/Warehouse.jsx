@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import { useStatuses } from '../hooks/useStatuses';
+import { useLibraryText } from '../hooks/useLibraryText';
 
 const emptyForm = {
   brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: 'no',
@@ -19,9 +21,12 @@ export default function Warehouse() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ brand: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', status: '' });
+  const [serialMatches, setSerialMatches] = useState([]);
+  const [filters, setFilters] = useState({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' });
   const [sort, setSort] = useState({ col: 'brand', dir: 1 });
   const { can } = useAuth();
+  const { badgeClass } = useStatuses();
+  const { tr } = useLibraryText();
   const { t } = useLang();
   const canEdit = can('warehouse', 'edit');
 
@@ -32,6 +37,16 @@ export default function Warehouse() {
     api.get('/library').then(r => setLib(r.data));
   }
   useEffect(load, []);
+
+  // Поиск по серийным номерам — с задержкой, чтобы не долбить сервер на каждую букву
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) { setSerialMatches([]); return; }
+    const timer = setTimeout(() => {
+      api.get('/serials/search', { params: { q } }).then(r => setSerialMatches(r.data));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   async function submit(e) {
     e.preventDefault();
@@ -61,15 +76,16 @@ export default function Warehouse() {
   }
 
   const opts = useMemo(() => {
+    const seriesFromData = uniq(laptops.map(l => l.series));
     if (lib) {
       return {
-        brand: lib.brands.map(b => b.name),
+        brand: lib.brands.map(b => b.name), series: seriesFromData,
         cpu: lib.values.cpu.map(v => v.value), ram: lib.values.ram.map(v => v.value),
         gpu: lib.values.gpu.map(v => v.value), storage: lib.values.storage.map(v => v.value),
         color: lib.values.color.map(v => v.value), screen: lib.values.screen.map(v => v.value),
       };
     }
-    return { brand: uniq(laptops.map(l => l.brand)), cpu: uniq(laptops.map(l => l.cpu)), ram: uniq(laptops.map(l => l.ram)),
+    return { brand: uniq(laptops.map(l => l.brand)), series: seriesFromData, cpu: uniq(laptops.map(l => l.cpu)), ram: uniq(laptops.map(l => l.ram)),
       gpu: uniq(laptops.map(l => l.gpu)), storage: uniq(laptops.map(l => l.storage)), color: uniq(laptops.map(l => l.color)),
       screen: uniq(laptops.map(l => l.screen)) };
   }, [laptops, lib]);
@@ -80,10 +96,51 @@ export default function Warehouse() {
     return b ? b.series.map(s => s.name) : [];
   }, [lib, form.brand]);
 
+  // Товары, которые реально есть в наличии — фильтры строятся только по ним
+  const inStockLaptops = useMemo(() => laptops.filter(l => Number(l.in_stock) > 0), [laptops]);
+
+  // Каскадные варианты для фильтров: для поля key берём уникальные значения среди товаров в наличии,
+  // которые уже подходят под ВСЕ остальные выбранные фильтры (кроме самого key) — так после выбора
+  // серии в CPU останутся только процессоры тех моделей этой серии, что реально есть на складе.
+  const FILTER_FIELDS = ['brand', 'series', 'cpu', 'ram', 'gpu', 'storage', 'color', 'screen', 'touch'];
+  function filterOptsFor(key) {
+    const matches = inStockLaptops.filter(l => {
+      for (const k of FILTER_FIELDS) {
+        if (k === key) continue;
+        if (filters[k] && l[k] !== filters[k]) return false;
+      }
+      if (filters.hot === 'yes' && !l.is_hot) return false;
+      if (filters.hot === 'no' && l.is_hot) return false;
+      return true;
+    });
+    return uniq(matches.map(l => l[key]));
+  }
+  const filterOpts = useMemo(() => {
+    const res = {};
+    FILTER_FIELDS.forEach(k => { res[k] = filterOptsFor(k); });
+    return res;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inStockLaptops, filters]);
+
+  // Если выбранное значение фильтра больше не входит в допустимые варианты (например, сузили другим
+  // фильтром) — тихо сбрасываем именно это поле, чтобы не оставался "невозможный" выбор
+  useEffect(() => {
+    setFilters(f => {
+      let changed = false;
+      const next = { ...f };
+      for (const k of FILTER_FIELDS) {
+        if (f[k] && !filterOptsFor(k).includes(f[k])) { next[k] = ''; changed = true; }
+      }
+      return changed ? next : f;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inStockLaptops]);
+
   const filtered = useMemo(() => {
     let list = laptops.filter(l => {
       if (search && !`${l.brand} ${l.series} ${l.cpu} ${l.ram} ${l.gpu} ${l.storage} ${l.color} ${l.screen}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filters.brand && l.brand !== filters.brand) return false;
+      if (filters.series && l.series !== filters.series) return false;
       if (filters.cpu && l.cpu !== filters.cpu) return false;
       if (filters.ram && l.ram !== filters.ram) return false;
       if (filters.gpu && l.gpu !== filters.gpu) return false;
@@ -91,6 +148,8 @@ export default function Warehouse() {
       if (filters.color && l.color !== filters.color) return false;
       if (filters.screen && l.screen !== filters.screen) return false;
       if (filters.touch && l.touch !== filters.touch) return false;
+      if (filters.hot === 'yes' && !l.is_hot) return false;
+      if (filters.hot === 'no' && l.is_hot) return false;
       if (filters.status === 'instock' && Number(l.in_stock) === 0) return false;
       if (filters.status === 'empty' && Number(l.in_stock) > 0) return false;
       return true;
@@ -160,7 +219,7 @@ export default function Warehouse() {
       {showForm && canEdit && (
         <form onSubmit={submit} className="card mb-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <input className="inp" placeholder={t('name') + ' (бренд)'} list="brand-list" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} required />
+            <input className="inp" placeholder="Бренд" list="brand-list" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} required />
             <datalist id="brand-list">{opts.brand.map(b => <option key={b} value={b} />)}</datalist>
             <input className="inp" placeholder="Серия" list="series-list" value={form.series} onChange={e => setForm(f => ({ ...f, series: e.target.value }))} />
             <datalist id="series-list">{seriesOpts.map(v => <option key={v} value={v} />)}</datalist>
@@ -202,18 +261,42 @@ export default function Warehouse() {
       )}
 
       <div className="flex gap-2 flex-wrap mb-3">
-        <input className="inp flex-1 min-w-[160px]" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="inp flex-1 min-w-[160px]" placeholder="Поиск... (в т.ч. по серийному номеру)" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {serialMatches.length > 0 && (
+        <div className="card mb-4">
+          <div className="font-bold text-sm mb-2">🔍 Найдено по серийному номеру</div>
+          {serialMatches.map(m => (
+            <Link key={m.id} to={`/serials/${m.id}`} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
+              <span className="font-mono">{m.serial}</span>
+              <span className="text-text3">{m.brand} {m.series}</span>
+              <span className={`badge ${badgeClass(m.status_id)}`}>{m.status_id}</span>
+            </Link>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mb-4">
-        {['brand', 'cpu', 'ram', 'gpu', 'storage', 'color', 'screen'].map(k => (
+        {[['brand', 'Бренд'], ['series', 'Серия'], ['cpu', 'CPU'], ['ram', 'RAM'], ['gpu', 'GPU'], ['storage', 'Накопитель'], ['color', 'Цвет'], ['screen', 'Экран']].map(([k, label]) => (
           <select key={k} className="inp text-xs" value={filters[k]} onChange={e => setFilters(f => ({ ...f, [k]: e.target.value }))}>
-            <option value="">{k}</option>
-            {opts[k].map(v => <option key={v} value={v}>{v}</option>)}
+            <option value="">{label}</option>
+            {filterOpts[k].map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         ))}
+        <select className="inp text-xs" value={filters.touch} onChange={e => setFilters(f => ({ ...f, touch: e.target.value }))}>
+          <option value="">Сенсор</option>
+          {filterOpts.touch.includes('yes') && <option value="yes">Да</option>}
+          {filterOpts.touch.includes('no') && <option value="no">Нет</option>}
+        </select>
+        <select className="inp text-xs" value={filters.hot} onChange={e => setFilters(f => ({ ...f, hot: e.target.value }))}>
+          <option value="">🔥 Хит</option><option value="yes">Да</option><option value="no">Нет</option>
+        </select>
         <select className="inp text-xs" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
           <option value="">Статус</option><option value="instock">Есть</option><option value="empty">Нет</option>
         </select>
+        {Object.values(filters).some(v => v) && (
+          <button className="btn btn-danger btn-sm text-xs" onClick={() => setFilters({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' })}>✕ Сбросить</button>
+        )}
       </div>
 
       <div className="card p-0 overflow-hidden">
@@ -237,12 +320,12 @@ export default function Warehouse() {
                   </td>
                   <td className="py-2">
                     <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
-                      {l.brand} {l.series} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
+                      {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
                     </Link>
-                    <div className="text-xs text-text3">{[l.cpu, l.ram, l.storage].filter(Boolean).join(' · ')}</div>
+                    <div className="text-xs text-text3">{[tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage)].filter(Boolean).join(' · ')}</div>
                   </td>
-                  <td className="py-2 text-xs text-text3">{l.gpu || '—'}</td>
-                  <td className="py-2 text-xs text-text3">{l.color || '—'}</td>
+                  <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
+                  <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
                   <td className="py-2">
                     <div className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</div>
                     <div className="text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>

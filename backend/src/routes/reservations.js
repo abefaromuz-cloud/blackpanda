@@ -11,7 +11,7 @@ async function releaseExpired() {
   );
   for (const row of expired.rows) {
     await pool.query('UPDATE reservations SET active=false WHERE id=$1', [row.id]);
-    await pool.query(`UPDATE serials SET status_id='s2' WHERE id=$1 AND status_id='s15'`, [row.serial_id]);
+    await pool.query(`UPDATE serials SET status_id='На складе' WHERE id=$1 AND status_id='Зарезервирован'`, [row.serial_id]);
   }
 }
 
@@ -38,9 +38,9 @@ router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (re
     await client.query('BEGIN');
     const created = [];
     for (const sn of serials) {
-      const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id='s2'`, [sn]);
+      const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')`, [sn]);
       if (!sr.rows[0]) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
-      await client.query(`UPDATE serials SET status_id='s15' WHERE id=$1`, [sr.rows[0].id]);
+      await client.query(`UPDATE serials SET status_id='Зарезервирован' WHERE id=$1`, [sr.rows[0].id]);
       const r = await client.query(
         `INSERT INTO reservations (serial_id, client_id, deadline, note, pay_type, pay_amount_rub)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -69,7 +69,7 @@ router.delete('/:id', authenticate, requirePermission('warehouse', 'edit'), asyn
   const r = await pool.query('SELECT * FROM reservations WHERE id=$1', [req.params.id]);
   if (!r.rows[0]) return res.status(404).json({ error: 'Не найдено' });
   await pool.query('UPDATE reservations SET active=false WHERE id=$1', [req.params.id]);
-  await pool.query(`UPDATE serials SET status_id='s2' WHERE id=$1 AND status_id='s15'`, [r.rows[0].serial_id]);
+  await pool.query(`UPDATE serials SET status_id='На складе' WHERE id=$1 AND status_id='Зарезервирован'`, [r.rows[0].serial_id]);
   res.json({ success: true });
 });
 

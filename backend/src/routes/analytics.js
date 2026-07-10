@@ -9,7 +9,7 @@ router.get('/', authenticate, requirePermission('analytics', 'view'), async (req
       pool.query(`
         SELECT l.brand, COUNT(*) AS qty
         FROM serials s JOIN laptops l ON l.id = s.laptop_id
-        WHERE s.status_id = 's3'
+        WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold')
         GROUP BY l.brand ORDER BY qty DESC
       `),
       pool.query(`
@@ -21,7 +21,7 @@ router.get('/', authenticate, requirePermission('analytics', 'view'), async (req
       pool.query(`
         SELECT l.brand, l.series, COUNT(*) AS qty
         FROM serials s JOIN laptops l ON l.id = s.laptop_id
-        WHERE s.status_id='s3'
+        WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold')
         GROUP BY l.brand, l.series ORDER BY qty DESC LIMIT 10
       `),
     ]);

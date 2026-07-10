@@ -4,11 +4,8 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { printSerialLabel } from '../utils/print';
-
-const statusOptions = [
-  ['s1', 'В пути'], ['s2', 'На складе'], ['s15', 'Резерв'], ['s3', 'Продан'],
-];
-const statusKey = { s1: ['inTransit', 'badge-yellow'], s2: ['inStock', 'badge-green'], s15: ['reserved', 'badge-blue'], s3: ['soldTotal', 'badge-red'] };
+import { useStatuses } from '../hooks/useStatuses';
+import { useLibraryText } from '../hooks/useLibraryText';
 
 export default function LaptopDetail() {
   const { id } = useParams();
@@ -22,6 +19,8 @@ export default function LaptopDetail() {
   const [editForm, setEditForm] = useState(null);
   const { can } = useAuth();
   const { t } = useLang();
+  const { statuses, badgeClass, isInStock, displayLabel } = useStatuses();
+  const { tr } = useLibraryText();
   const canEdit = can('warehouse', 'edit');
 
   function load() { api.get(`/laptops/${id}`).then(r => setL(r.data)); }
@@ -58,7 +57,7 @@ export default function LaptopDetail() {
     setSelected(s => s.includes(sn) ? s.filter(x => x !== sn) : [...s, sn]);
   }
   function toggleAll(e) {
-    setSelected(e.target.checked ? l.serials.filter(s => s.status_id === 's2').map(s => s.serial) : []);
+    setSelected(e.target.checked ? l.serials.filter(s => isInStock(s.status_id)).map(s => s.serial) : []);
   }
 
   function sellSelected() {
@@ -93,16 +92,16 @@ export default function LaptopDetail() {
   if (!l) return <div className="text-text3">{t('loading')}</div>;
 
   const images = (l.images && l.images.length ? l.images : (l.image_url ? [l.image_url] : []));
-  const availableCount = l.serials.filter(s => s.status_id === 's2').length;
+  const availableCount = l.serials.filter(s => isInStock(s.status_id)).length;
 
   return (
     <div>
       <Link to="/warehouse" className="text-text3 text-sm hover:text-text2">← {t('warehouse')}</Link>
       <div className="flex justify-between items-start mt-2 mb-1 flex-wrap gap-2">
-        <h1 className="text-xl font-black">{l.brand} {l.series} {l.is_hot && <span className="badge badge-yellow ml-1">🔥 хит</span>}</h1>
+        <h1 className="text-xl font-black">{tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥 хит</span>}</h1>
         {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
       </div>
-      <div className="text-text3 text-sm mb-5">{l.cpu} · {l.ram} · {l.gpu} · {l.storage} · {l.color}</div>
+      <div className="text-text3 text-sm mb-5">{tr('cpu', l.cpu)} · {tr('ram', l.ram)} · {tr('gpu', l.gpu)} · {tr('storage', l.storage)} · {tr('color', l.color)}</div>
 
       {editing ? (
         <form onSubmit={saveEdit} className="card mb-5">
@@ -153,12 +152,12 @@ export default function LaptopDetail() {
             ) : <div className="w-full h-40 bg-bg3 rounded-lg flex items-center justify-center text-text3">🐼</div>}
           </div>
           <div className="card md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-            <div><div className="text-xs text-text3">Экран</div><div className="font-bold">{l.screen || '—'}</div></div>
-            <div><div className="text-xs text-text3">CPU</div><div className="font-bold">{l.cpu || '—'}</div></div>
-            <div><div className="text-xs text-text3">RAM</div><div className="font-bold">{l.ram || '—'}</div></div>
-            <div><div className="text-xs text-text3">Накопитель</div><div className="font-bold">{l.storage || '—'}</div></div>
-            <div><div className="text-xs text-text3">GPU</div><div className="font-bold">{l.gpu || '—'}</div></div>
-            <div><div className="text-xs text-text3">Цвет</div><div className="font-bold">{l.color || '—'}</div></div>
+            <div><div className="text-xs text-text3">Экран</div><div className="font-bold">{tr('screen', l.screen) || '—'}</div></div>
+            <div><div className="text-xs text-text3">CPU</div><div className="font-bold">{tr('cpu', l.cpu) || '—'}</div></div>
+            <div><div className="text-xs text-text3">RAM</div><div className="font-bold">{tr('ram', l.ram) || '—'}</div></div>
+            <div><div className="text-xs text-text3">Накопитель</div><div className="font-bold">{tr('storage', l.storage) || '—'}</div></div>
+            <div><div className="text-xs text-text3">GPU</div><div className="font-bold">{tr('gpu', l.gpu) || '—'}</div></div>
+            <div><div className="text-xs text-text3">Цвет</div><div className="font-bold">{tr('color', l.color) || '—'}</div></div>
             <div><div className="text-xs text-text3">Сенсор</div><div className="font-bold">{l.touch === 'yes' ? 'Да' : 'Нет'}</div></div>
             <div><div className="text-xs text-text3">Закупка</div><div className="font-bold font-mono">¥{l.cost_cny}</div></div>
             <div><div className="text-xs text-text3">Продажа</div><div className="font-bold font-mono text-yellow">¥{l.price_sell_cny} ≈ {Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div></div>
@@ -206,16 +205,16 @@ export default function LaptopDetail() {
               {l.serials.map(s => (
                 <tr key={s.id} className="border-b border-border last:border-0">
                   <td className="py-2">
-                    {s.status_id === 's2' && <input type="checkbox" checked={selected.includes(s.serial)} onChange={() => toggleSelect(s.serial)} />}
+                    {isInStock(s.status_id) && <input type="checkbox" checked={selected.includes(s.serial)} onChange={() => toggleSelect(s.serial)} />}
                   </td>
                   <td className="py-2 font-mono"><Link to={`/serials/${s.id}`} className="hover:text-accent2 hover:underline">{s.serial}</Link></td>
                   <td className="py-2">
                     {canEdit ? (
                       <select className="inp text-xs py-1" value={s.status_id} onChange={e => changeStatus(s.id, e.target.value)}>
-                        {statusOptions.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
+                        {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
                       </select>
                     ) : (
-                      <span className={`badge ${(statusKey[s.status_id] || ['', 'badge-blue'])[1]}`}>{s.status_id}</span>
+                      <span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span>
                     )}
                   </td>
                   <td className="py-2 text-text3">{s.arrival_date ? new Date(s.arrival_date).toLocaleDateString('ru-RU') : '—'}</td>

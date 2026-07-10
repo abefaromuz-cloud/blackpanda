@@ -24,7 +24,7 @@ export const translations = {
     income: 'Приход', expense: 'Расход', amount: 'Сумма', comment: 'Комментарий', type: 'Тип',
     total: 'Итого', date: 'Дата',
     monthlySales: 'Продажи и прибыль по месяцам', topModels: 'Топ моделей', revenue: 'Выручка', profit: 'Прибыль', sold: 'продано',
-    suppliers: 'Поставщики', finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', importPage: 'Импорт', employees: 'Сотрудники', activityLog: 'Журнал действий',
+    finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', importPage: 'Импорт', employees: 'Сотрудники', activityLog: 'Журнал действий',
     addSupplier: '+ Поставщик', contactPerson: 'Контактное лицо', wechat: 'WeChat', country: 'Страна', itemsSupplied: 'Поставлено единиц',
     addEmployee: '+ Сотрудник', position: 'Должность', hireDate: 'Дата найма', salary: 'Зарплата', linkedAccount: 'Учётная запись',
     grossProfit: 'Валовая прибыль', netProfit: 'Чистая прибыль', expenses: 'Расходы', expensesByCategory: 'Расходы по категориям', category: 'Категория',
@@ -53,6 +53,12 @@ export const translations = {
     library: 'Справочник', brandsAndSeries: 'Бренды и серии', addBrand: '+ Бренд', addSeries: '+ Серия',
     processors: 'Процессоры', gpus: 'Видеокарты', rams: 'Оперативная память', storages: 'Накопители',
     colors: 'Цвета', screens: 'Экраны', addValue: '+ Добавить', menuOrder: 'Порядок меню',
+    arrivals: 'Приход товара', service: 'Сервис',
+    arrivalForm: 'Оформить приход', arrivalReport: 'Отчёт по приходам', unitCost: 'Себестоимость за штуку ¥',
+    ourDevice: 'Наш ноутбук', externalDevice: 'Внешнее устройство', deviceLabel: 'Марка/модель (со слов клиента)',
+    warrantyCase: 'Гарантийный случай', repairCost: 'Стоимость ремонта ₽', technician: 'Мастер',
+    inProgress: 'В ремонте', doneStatus: 'Готово', issued: 'Выдано', declined: 'Отказ',
+    newServiceOrder: '+ Заявка в сервис', checkSerial: 'Проверить по серийнику',
   },
   zh: {
     dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单',
@@ -79,7 +85,7 @@ export const translations = {
     income: '收入', expense: '支出', amount: '金额', comment: '备注', type: '类型',
     total: '总计', date: '日期',
     monthlySales: '月度销售与利润', topModels: '热销型号', revenue: '收入', profit: '利润', sold: '已售',
-    suppliers: '供应商', finance: '财务', analytics: '分析', reports: '报表', importPage: '导入', employees: '员工', activityLog: '操作日志',
+    finance: '财务', analytics: '分析', reports: '报表', importPage: '导入', employees: '员工', activityLog: '操作日志',
     addSupplier: '+ 供应商', contactPerson: '联系人', wechat: '微信', country: '国家', itemsSupplied: '供货数量',
     addEmployee: '+ 员工', position: '职位', hireDate: '入职日期', salary: '工资', linkedAccount: '关联账户',
     grossProfit: '毛利润', netProfit: '净利润', expenses: '支出', expensesByCategory: '按类别支出', category: '类别',
@@ -108,6 +114,12 @@ export const translations = {
     library: '资料库', brandsAndSeries: '品牌与系列', addBrand: '+ 品牌', addSeries: '+ 系列',
     processors: '处理器', gpus: '显卡', rams: '内存', storages: '存储',
     colors: '颜色', screens: '屏幕', addValue: '+ 添加', menuOrder: '菜单顺序',
+    arrivals: '入库', service: '维修服务',
+    arrivalForm: '登记入库', arrivalReport: '入库报表', unitCost: '单台成本 ¥',
+    ourDevice: '自有设备', externalDevice: '外部设备', deviceLabel: '品牌/型号（客户提供）',
+    warrantyCase: '保修情形', repairCost: '维修费用 ₽', technician: '维修员',
+    inProgress: '维修中', doneStatus: '已完成', issued: '已发还', declined: '拒绝',
+    newServiceOrder: '+ 维修工单', checkSerial: '按序列号查询',
   }
 };
 
@@ -118,7 +130,9 @@ export const roleLabels = {
 
 export const pageLabels = {
   ru: { dashboard: 'Дашборд', warehouse: 'Склад', clients: 'Клиенты', preorders: 'Предзаказы', sales: 'Продажи', cash: 'Касса', settings: 'Настройки', admin: 'Админ-панель', client_portal: 'Портал клиента',
-    suppliers: 'Поставщики', finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', import: 'Импорт', employees: 'Сотрудники', activity_log: 'Журнал действий', scan: 'Сканер', broadcast: 'Рассылка', library: 'Справочник' },
+    finance: 'Финансы', analytics: 'Аналитика', reports: 'Отчёты', import: 'Импорт', employees: 'Сотрудники', activity_log: 'Журнал действий', scan: 'Сканер', broadcast: 'Рассылка', library: 'Справочник',
+    arrivals: 'Приход товара', service: 'Сервис' },
   zh: { dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单', sales: '销售', cash: '收银', settings: '设置', admin: '管理面板', client_portal: '客户门户',
-    suppliers: '供应商', finance: '财务', analytics: '分析', reports: '报表', import: '导入', employees: '员工', activity_log: '操作日志', scan: '扫描', broadcast: '群发', library: '资料库' },
+    finance: '财务', analytics: '分析', reports: '报表', import: '导入', employees: '员工', activity_log: '操作日志', scan: '扫描', broadcast: '群发', library: '资料库',
+    arrivals: '入库', service: '维修服务' },
 };

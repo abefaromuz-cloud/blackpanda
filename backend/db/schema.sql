@@ -42,7 +42,6 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('staff','cash',true,true),
   ('staff','settings',false,false),
   ('staff','admin',false,false),
-  ('staff','suppliers',true,true),
   ('staff','finance',true,false),
   ('staff','analytics',true,false),
   ('staff','reports',true,false),
@@ -52,6 +51,8 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('staff','scan',true,true),
   ('staff','broadcast',true,true),
   ('staff','library',true,true),
+  ('staff','arrivals',true,true),
+  ('staff','service',true,true),
   ('accountant','dashboard',true,false),
   ('accountant','warehouse',true,false),
   ('accountant','clients',true,false),
@@ -60,7 +61,6 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('accountant','cash',true,true),
   ('accountant','settings',false,false),
   ('accountant','admin',false,false),
-  ('accountant','suppliers',true,false),
   ('accountant','finance',true,true),
   ('accountant','analytics',true,false),
   ('accountant','reports',true,true),
@@ -70,6 +70,8 @@ INSERT INTO role_permissions (role, page_key, can_view, can_edit) VALUES
   ('accountant','scan',false,false),
   ('accountant','broadcast',false,false),
   ('accountant','library',false,false),
+  ('accountant','arrivals',false,false),
+  ('accountant','service',false,false),
   ('client','client_portal',true,false)
 ON CONFLICT (role, page_key) DO NOTHING;
 
@@ -110,7 +112,7 @@ CREATE TABLE IF NOT EXISTS serials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   laptop_id UUID NOT NULL REFERENCES laptops(id) ON DELETE CASCADE,
   serial TEXT NOT NULL UNIQUE,
-  status_id TEXT NOT NULL DEFAULT 's2',
+  status_id TEXT NOT NULL DEFAULT 'На складе',
   arrival_date TIMESTAMPTZ,
   sale_date TIMESTAMPTZ,
   sale_client_id UUID REFERENCES clients(id),
@@ -212,18 +214,6 @@ CREATE TABLE IF NOT EXISTS settings (
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_client_id_fkey;
 ALTER TABLE users ADD CONSTRAINT users_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL;
 
--- Поставщики (у кого закупаем товар в Китае)
-CREATE TABLE IF NOT EXISTS suppliers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  contact_person TEXT,
-  phone TEXT,
-  wechat TEXT,
-  country TEXT DEFAULT 'CN',
-  notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 -- Сотрудники (HR-карточка; отдельно от учётных записей users — не у каждого сотрудника есть логин)
 CREATE TABLE IF NOT EXISTS employees (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -257,28 +247,34 @@ ALTER TABLE laptops ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS lib_brands (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT UNIQUE NOT NULL,
+  name_zh TEXT,
   sort_order INT NOT NULL DEFAULT 100
 );
 ALTER TABLE lib_brands ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
+ALTER TABLE lib_brands ADD COLUMN IF NOT EXISTS name_zh TEXT;
 
 CREATE TABLE IF NOT EXISTS lib_series (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   brand_id UUID NOT NULL REFERENCES lib_brands(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  name_zh TEXT,
   sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(brand_id, name)
 );
 ALTER TABLE lib_series ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
+ALTER TABLE lib_series ADD COLUMN IF NOT EXISTS name_zh TEXT;
 
 -- Справочник: плоские списки значений (CPU/GPU/RAM/накопитель/цвет/экран)
 CREATE TABLE IF NOT EXISTS lib_values (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   category TEXT NOT NULL, -- cpu | gpu | ram | storage | color | screen
   value TEXT NOT NULL,
+  value_zh TEXT,
   sort_order INT NOT NULL DEFAULT 100,
   UNIQUE(category, value)
 );
 ALTER TABLE lib_values ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
+ALTER TABLE lib_values ADD COLUMN IF NOT EXISTS value_zh TEXT;
 
 -- Порядок разделов в боковом меню (общий для всех, настраивается администратором)
 CREATE TABLE IF NOT EXISTS nav_order (
@@ -286,26 +282,89 @@ CREATE TABLE IF NOT EXISTS nav_order (
   sort_order INT NOT NULL
 );
 
--- Стартовый набор, чтобы список не был пустым — дальше пополняется вручную в разделе «Справочник»
-INSERT INTO lib_brands (name, sort_order) VALUES
-  ('Acer',100),('Apple',200),('Asus',300),('Dell',400),('HP',500),
-  ('Huawei',600),('Lenovo',700),('MSI',800),('Samsung',900),('Xiaomi',1000)
-ON CONFLICT (name) DO NOTHING;
-INSERT INTO lib_values (category, value, sort_order) VALUES
-  ('cpu','Apple M2',100),('cpu','Apple M3',200),('cpu','Intel Core i5-1240P',300),
-  ('cpu','Intel Core i5-13500H',400),('cpu','Intel Core i7-12700H',500),
-  ('cpu','Ryzen 5 5600H',600),('cpu','Ryzen 7 7840HS',700),
-  ('gpu','GeForce RTX 3050',100),('gpu','GeForce RTX 4060',200),('gpu','Intel Iris Xe',300),
-  ('gpu','Intel UHD Graphics',400),('gpu','Radeon 680M',500),
-  ('ram','16 GB',200),('ram','32 GB',300),('ram','64 GB',400),('ram','8 GB',100),
-  ('storage','1 TB SSD',300),('storage','2 TB SSD',400),('storage','256 GB SSD',100),('storage','512 GB SSD',200),
-  ('color','Синий',400),('color','Серебристый',200),('color','Серый',300),('color','Чёрный',100),
-  ('screen','13.3"',100),('screen','14"',200),('screen','15.6"',300),('screen','16"',400),('screen','17.3"',500)
-ON CONFLICT (category, value) DO NOTHING;
+-- Статусы товара (управляются в Справочнике). counts_as — к какой "корзине" относится статус
+-- для агрегатов на складе/дашборде: instock | intransit | reserved | sold | other
+CREATE TABLE IF NOT EXISTS lib_statuses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  label TEXT UNIQUE NOT NULL,
+  label_zh TEXT,
+  counts_as TEXT NOT NULL DEFAULT 'other',
+  sort_order INT NOT NULL DEFAULT 100
+);
+ALTER TABLE lib_statuses ADD COLUMN IF NOT EXISTS counts_as TEXT NOT NULL DEFAULT 'other';
+ALTER TABLE lib_statuses ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
+ALTER TABLE lib_statuses ADD COLUMN IF NOT EXISTS label_zh TEXT;
 
-ALTER TABLE serials ADD COLUMN IF NOT EXISTS supplier_id UUID REFERENCES suppliers(id);
+INSERT INTO lib_statuses (label, label_zh, counts_as, sort_order) VALUES
+  ('В пути','在途','intransit',100),
+  ('На складе','在库','instock',200),
+  ('Продан','已售','sold',300),
+  ('Возврат','退货','other',400),
+  ('Гарантия КНР','中国保修','other',500),
+  ('На ремонте','维修中','other',600),
+  ('Потерян','丢失','other',700),
+  ('Склад (восст.)','库存（翻新）','instock',800),
+  ('Новый (Коробка повр.)','全新（包装破损）','instock',900),
+  ('Зарезервирован','已预留','reserved',1000)
+ON CONFLICT (label) DO UPDATE SET label_zh = EXCLUDED.label_zh WHERE lib_statuses.label_zh IS NULL;
+
+-- Разовая идемпотентная миграция старых кодов статусов (s1/s2/s3/s15) на новые текстовые метки.
+-- Условие "status_id='s2'" перестаёт находить строки после первого выполнения, поэтому повторные
+-- прогоны миграции ничего не ломают.
+UPDATE serials SET status_id='В пути' WHERE status_id='s1';
+UPDATE serials SET status_id='На складе' WHERE status_id='s2';
+UPDATE serials SET status_id='Продан' WHERE status_id='s3';
+UPDATE serials SET status_id='Зарезервирован' WHERE status_id='s15';
+UPDATE serial_history SET status_id='В пути' WHERE status_id='s1';
+UPDATE serial_history SET status_id='На складе' WHERE status_id='s2';
+UPDATE serial_history SET status_id='Продан' WHERE status_id='s3';
+UPDATE serial_history SET status_id='Зарезервирован' WHERE status_id='s15';
+
+-- Стартовый набор, чтобы список не был пустым — дальше пополняется вручную в разделе «Справочник»
+INSERT INTO lib_brands (name, name_zh, sort_order) VALUES
+  ('Acer','宏碁',100),('Apple','苹果',200),('Asus','华硕',300),('Dell','戴尔',400),('HP','惠普',500),
+  ('Huawei','华为',600),('Lenovo','联想',700),('MSI','微星',800),('Samsung','三星',900),('Xiaomi','小米',1000)
+ON CONFLICT (name) DO UPDATE SET name_zh = EXCLUDED.name_zh WHERE lib_brands.name_zh IS NULL;
+INSERT INTO lib_values (category, value, value_zh, sort_order) VALUES
+  ('cpu','Apple M2','Apple M2',100),('cpu','Apple M3','Apple M3',200),('cpu','Intel Core i5-1240P','英特尔酷睿 i5-1240P',300),
+  ('cpu','Intel Core i5-13500H','英特尔酷睿 i5-13500H',400),('cpu','Intel Core i7-12700H','英特尔酷睿 i7-12700H',500),
+  ('cpu','Ryzen 5 5600H','锐龙 5 5600H',600),('cpu','Ryzen 7 7840HS','锐龙 7 7840HS',700),
+  ('gpu','GeForce RTX 3050','GeForce RTX 3050',100),('gpu','GeForce RTX 4060','GeForce RTX 4060',200),('gpu','Intel Iris Xe','英特尔锐炬 Xe',300),
+  ('gpu','Intel UHD Graphics','英特尔UHD显卡',400),('gpu','Radeon 680M','镭龙 680M',500),
+  ('ram','16 GB','16GB',200),('ram','32 GB','32GB',300),('ram','64 GB','64GB',400),('ram','8 GB','8GB',100),
+  ('storage','1 TB SSD','1TB固态硬盘',300),('storage','2 TB SSD','2TB固态硬盘',400),('storage','256 GB SSD','256GB固态硬盘',100),('storage','512 GB SSD','512GB固态硬盘',200),
+  ('color','Синий','蓝色',400),('color','Серебристый','银色',200),('color','Серый','灰色',300),('color','Чёрный','黑色',100),
+  ('screen','13.3"','13.3英寸',100),('screen','14"','14英寸',200),('screen','15.6"','15.6英寸',300),('screen','16"','16英寸',400),('screen','17.3"','17.3英寸',500)
+ON CONFLICT (category, value) DO UPDATE SET value_zh = EXCLUDED.value_zh WHERE lib_values.value_zh IS NULL;
+
+ALTER TABLE serials DROP COLUMN IF EXISTS supplier_id;
+DROP TABLE IF EXISTS suppliers CASCADE;
+DELETE FROM role_permissions WHERE page_key='suppliers';
+DELETE FROM user_permissions WHERE page_key='suppliers';
+
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS cost_cny NUMERIC(12,2);
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS arrival_note TEXT;
+
+-- Сервис/ремонт: и наши ноутбуки (свой серийник), и внешние (клиент принёс своё устройство)
+CREATE TABLE IF NOT EXISTS service_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  kind TEXT NOT NULL DEFAULT 'external', -- own_stock | external
+  serial_id UUID REFERENCES serials(id) ON DELETE SET NULL, -- заполнено, если kind='own_stock'
+  device_label TEXT, -- для external: марка/модель со слов клиента
+  client_id UUID REFERENCES clients(id),
+  issue TEXT,
+  is_warranty BOOLEAN NOT NULL DEFAULT false,
+  cost_rub NUMERIC(12,2) DEFAULT 0,
+  technician TEXT,
+  status TEXT NOT NULL DEFAULT 'in_progress', -- in_progress | done | issued | declined
+  received_date TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_date TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other';
 ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS bank_key TEXT;
+ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS recipient TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS balance_rub NUMERIC(14,2) NOT NULL DEFAULT 0;
 
 -- Резервирование конкретного серийника за клиентом до дедлайна

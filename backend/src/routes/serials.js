@@ -3,11 +3,31 @@ const pool = require('../db/pool');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const router = express.Router();
 
+// Поиск по ЧАСТИ серийного номера (для поисковой строки на складе) — важно: этот роут должен идти
+// раньше /lookup/:serial и /detail/:id, иначе Express примет 'search' за параметр :serial
+router.get('/search', authenticate, requirePermission('warehouse', 'view'), async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) return res.json([]);
+  try {
+    const result = await pool.query(
+      `SELECT s.id, s.serial, s.status_id, l.id AS laptop_id, l.brand, l.series
+       FROM serials s JOIN laptops l ON l.id = s.laptop_id
+       WHERE s.serial ILIKE $1
+       ORDER BY s.serial LIMIT 20`,
+      [`%${q}%`]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
 // Поиск по серийнику (для сканера) — отдаёт статус и модель
 router.get('/lookup/:serial', authenticate, requirePermission('warehouse', 'view'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT s.*, l.brand, l.series FROM serials s JOIN laptops l ON l.id=s.laptop_id WHERE s.serial=$1`,
+      `SELECT s.*, l.brand, l.series, st.counts_as AS bucket
+       FROM serials s JOIN laptops l ON l.id=s.laptop_id
+       LEFT JOIN lib_statuses st ON st.label = s.status_id
+       WHERE s.serial=$1`,
       [req.params.serial]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Серийник не найден' });
@@ -40,11 +60,11 @@ router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (re
     const result = await pool.query(
       `INSERT INTO serials (laptop_id, serial, status_id, arrival_date, warranty_months, notes)
        VALUES ($1,$2,$3, now(), $4,$5) RETURNING *`,
-      [laptop_id, serial.trim(), status_id || 's2', warranty_months || 3, notes || null]
+      [laptop_id, serial.trim(), status_id || 'На складе', warranty_months || 3, notes || null]
     );
     await pool.query(
       `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,$3)`,
-      [result.rows[0].id, status_id || 's2', 'Добавлен на склад']
+      [result.rows[0].id, status_id || 'На складе', 'Добавлен на склад']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -65,7 +85,7 @@ router.post('/bulk', authenticate, requirePermission('warehouse', 'edit'), async
       const s = sn.trim();
       if (!s) continue;
       const r = await client.query(
-        `INSERT INTO serials (laptop_id, serial, status_id, arrival_date) VALUES ($1,$2,'s2', now())
+        `INSERT INTO serials (laptop_id, serial, status_id, arrival_date) VALUES ($1,$2,'На складе', now())
          ON CONFLICT (serial) DO NOTHING RETURNING *`,
         [laptop_id, s]
       );
@@ -97,15 +117,17 @@ router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
-// Оформить возврат: серийник возвращается на склад, в истории фиксируется от кого и по какой причине
+// Оформить возврат: фиксируется от какого клиента и по какой причине, новый статус выбирает сотрудник
+// (например "Склад (восст.)", "Гарантия КНР", "На ремонте" — а не всегда просто обратно "На складе")
 router.post('/:id/return', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
-  const { reason } = req.body;
+  const { reason, new_status } = req.body;
+  if (!new_status) return res.status(400).json({ error: 'Укажите новый статус после возврата' });
   try {
     const sr = await pool.query('SELECT s.*, c.name AS client_name FROM serials s LEFT JOIN clients c ON c.id=s.sale_client_id WHERE s.id=$1', [req.params.id]);
     if (!sr.rows[0]) return res.status(404).json({ error: 'Не найден' });
-    await pool.query(`UPDATE serials SET status_id='s2' WHERE id=$1`, [req.params.id]);
-    const note = `Возврат${sr.rows[0].client_name ? ' от клиента ' + sr.rows[0].client_name : ''}${reason ? ': ' + reason : ''}`;
-    await pool.query('INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,\'s2\',$2)', [req.params.id, note]);
+    await pool.query(`UPDATE serials SET status_id=$1 WHERE id=$2`, [new_status, req.params.id]);
+    const note = `Возврат${sr.rows[0].client_name ? ' от клиента ' + sr.rows[0].client_name : ''}${reason ? ': ' + reason : ''} → новый статус: ${new_status}`;
+    await pool.query('INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,$3)', [req.params.id, new_status, note]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });

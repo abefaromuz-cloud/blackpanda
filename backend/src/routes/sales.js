@@ -43,7 +43,7 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
       if (!laptop) throw { status: 400, message: 'Модель не найдена' };
       const sers = [];
       for (const sn of it.serials) {
-        const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN ('s2','s15')`, [sn]);
+        const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved'))`, [sn]);
         if (!sr.rows[0]) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
         sers.push(sr.rows[0]);
       }
@@ -87,9 +87,9 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
         [sale.rows[0].id, ri.laptop.id, ri.sers.map(s => s.id), ri.qty, ri.unitPriceCny, ri.unitPriceCny * rate, ri.costCny, ri.totalCny]
       );
       for (const sr of ri.sers) {
-        await client.query(`UPDATE serials SET status_id='s3', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [client_id || null, sr.id]);
+        await client.query(`UPDATE serials SET status_id='Продан', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [client_id || null, sr.id]);
         await client.query(
-          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3',$2)`,
+          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'Продан',$2)`,
           [sr.id, 'Продан' + (client_id ? ' клиенту ' + (cl?.name || '') : '')]
         );
         // Если серийник был зарезервирован — закрываем резерв

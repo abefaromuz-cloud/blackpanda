@@ -27,7 +27,7 @@ router.get('/warehouse', authenticate, requirePermission('reports', 'view'), asy
   try {
     const result = await pool.query(`
       SELECT l.brand, l.series, l.cost_cny, l.price_sell_cny,
-        COUNT(s.id) FILTER (WHERE s.status_id='s2') AS in_stock
+        COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS in_stock
       FROM laptops l LEFT JOIN serials s ON s.laptop_id = l.id
       WHERE l.is_archived = false
       GROUP BY l.id ORDER BY l.brand, l.series

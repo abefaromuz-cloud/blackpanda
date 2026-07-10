@@ -72,9 +72,12 @@ router.put('/:id', authenticate, requirePermission('preorders', 'edit'), async (
 });
 
 // Передача товара клиенту по предзаказу: списывает серийники со склада, создаёт продажу,
-// обновляет кассу/долг клиента и шлёт уведомление в Telegram (аналог confirmPoTransfer из старой версии)
+// проводит оплату (нал/счёт/сплит/долг/баланс) и шлёт уведомление в Telegram
 router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'), async (req, res) => {
-  const { serials: scannedSerials, payment_mode } = req.body; // string[]
+  const {
+    serials: scannedSerials, payment_mode, pay_dest,
+    split_cash, split_bank, bank_dest, paid_now_rub, due_date,
+  } = req.body;
   if (!Array.isArray(scannedSerials) || !scannedSerials.length)
     return res.status(400).json({ error: 'Отсканируйте хотя бы один серийник' });
 
@@ -92,10 +95,16 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
     const settingsRes = await client.query('SELECT * FROM settings WHERE id=1');
     const settings = settingsRes.rows[0];
 
+    let cl = null;
+    if (po.client_id) {
+      const clRes = await client.query('SELECT * FROM clients WHERE id=$1 FOR UPDATE', [po.client_id]);
+      cl = clRes.rows[0];
+    }
+
     // Проверяем и группируем серийники по модели
     const byLaptop = {};
     for (const sn of scannedSerials) {
-      const serRes = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id='s2'`, [sn]);
+      const serRes = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved'))`, [sn]);
       const ser = serRes.rows[0];
       if (!ser) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
       const poItem = poItems.find(it => it.laptop_id === ser.laptop_id && it.item_status !== 'transferred');
@@ -107,11 +116,14 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
         throw { status: 400, message: 'Превышено количество по позиции предзаказа' };
     }
 
+    const mode = payment_mode || 'full';
+    if (mode === 'balance' && !cl) throw { status: 400, message: 'У предзаказа нет клиента для оплаты с баланса' };
+
     let totalCny = 0, totalRub = 0;
     const sale = await client.query(
       `INSERT INTO sales (client_id, preorder_id, total_cny, total_rub, rate, payment_mode, note)
        VALUES ($1,$2,0,0,$3,$4,$5) RETURNING *`,
-      [po.client_id, po.id, settings.rate, payment_mode || 'full', 'No.' + po.id.slice(-6)]
+      [po.client_id, po.id, settings.rate, mode, 'No.' + po.id.slice(-6)]
     );
 
     for (const lid in byLaptop) {
@@ -127,10 +139,11 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
         [sale.rows[0].id, lid, serials.map(s => s.id), qty, poItem.price_sell_cny, priceRub / qty, poItem.cost_cny, priceCny]
       );
       for (const ser of serials) {
-        await client.query(`UPDATE serials SET status_id='s3', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [po.client_id, ser.id]);
+        await client.query(`UPDATE serials SET status_id='Продан', sale_date=now(), sale_client_id=$1 WHERE id=$2`, [po.client_id, ser.id]);
+        await client.query(`UPDATE reservations SET active=false WHERE serial_id=$1 AND active=true`, [ser.id]);
         await client.query(
-          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'s3',$2)`,
-          [ser.id, 'Передан клиенту ' + ((await client.query('SELECT name FROM clients WHERE id=$1', [po.client_id])).rows[0]?.name || '')]
+          `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,'Продан',$2)`,
+          [ser.id, 'Передан клиенту' + (cl ? ' ' + cl.name : '') + ' по предзаказу No.' + po.id.slice(-6)]
         );
       }
       if (qty >= poItem.qty) {
@@ -140,14 +153,53 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
 
     await client.query('UPDATE sales SET total_cny=$1, total_rub=$2 WHERE id=$3', [totalCny, totalRub, sale.rows[0].id]);
 
-    if (payment_mode !== 'partial') {
-      await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [totalRub]);
-      await client.query(
-        `INSERT INTO cash_log (type, amount_rub, note, client_id) VALUES ('in',$1,$2,$3)`,
-        [totalRub, 'No.' + po.id.slice(-6), po.client_id]
-      );
+    // Оплата — та же логика, что и в обычной продаже через Сканер
+    if (mode === 'balance') {
+      const bal = Number(cl.balance_rub);
+      const fromBalance = Math.min(bal, totalRub);
+      const remainder = totalRub - fromBalance;
+      const newBalance = bal - fromBalance;
+      await client.query('UPDATE clients SET balance_rub=$1 WHERE id=$2', [newBalance, po.client_id]);
+      await client.query('INSERT INTO balance_history (client_id, amount_rub, note, balance_after_rub) VALUES ($1,$2,$3,$4)',
+        [po.client_id, -fromBalance, 'Оплата предзаказа с баланса', newBalance]);
+      if (remainder > 0) {
+        await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [remainder]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Доплата наличными к предзаказу (баланс не покрыл)',$2,'other')`,
+          [remainder, po.client_id]);
+      }
+    } else if (mode === 'partial') {
+      const paidNow = Math.max(0, Math.min(totalRub, Number(paid_now_rub) || 0));
+      const remaining = totalRub - paidNow;
+      if (paidNow > 0) {
+        await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [paidNow]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Частичная оплата предзаказа',$2,'other')`,
+          [paidNow, po.client_id]);
+      }
+      if (remaining > 0.5) {
+        await client.query('INSERT INTO debts (client_id, sale_id, amount_rub, due_date) VALUES ($1,$2,$3,$4)',
+          [po.client_id, sale.rows[0].id, remaining, due_date || null]);
+      }
+    } else if (mode === 'split') {
+      const cash = Math.max(0, Number(split_cash) || 0);
+      const bank = Math.max(0, Number(split_bank) || 0);
+      const bankKey = bank_dest || 'sber';
+      if (cash > 0) {
+        await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [cash]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Предзаказ (наличные)',$2,'other')`, [cash, po.client_id]);
+      }
+      if (bank > 0) {
+        await client.query('UPDATE bank_accounts SET balance_rub = balance_rub + $1 WHERE key=$2', [bank, bankKey]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category, bank_key) VALUES ('in',$1,'Предзаказ (перевод)',$2,'other',$3)`, [bank, po.client_id, bankKey]);
+      }
     } else {
-      await client.query('UPDATE clients SET debt_rub = debt_rub + $1 WHERE id=$2', [totalRub, po.client_id]);
+      const dest = pay_dest || 'cash';
+      if (dest === 'cash') {
+        await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [totalRub]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Предзаказ (наличные)',$2,'other')`, [totalRub, po.client_id]);
+      } else {
+        await client.query('UPDATE bank_accounts SET balance_rub = balance_rub + $1 WHERE key=$2', [totalRub, dest]);
+        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category, bank_key) VALUES ('in',$1,'Предзаказ (перевод)',$2,'other',$3)`, [totalRub, po.client_id, dest]);
+      }
     }
 
     const remainingRes = await client.query(
@@ -162,16 +214,14 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
     await logActivity(req.user, 'Передача товара по предзаказу', 'preorder', 'No.' + po.id.slice(-6));
 
     // Уведомление в Telegram — не блокирует ответ, если упадёт
-    const clientRes = await pool.query('SELECT * FROM clients WHERE id=$1', [po.client_id]);
-    const c = clientRes.rows[0];
-    if (c?.telegram) {
-      sendTelegramMessage(c.telegram,
+    if (cl?.telegram) {
+      sendTelegramMessage(cl.telegram,
         `BlackPanda\n\nВы получили товар:\nИтого: ${Math.round(totalRub).toLocaleString('ru-RU')} руб.` +
         (allDone ? '\n\nПредзаказ выполнен!' : '')
       ).catch(() => {});
     }
 
-    res.status(201).json({ sale: sale.rows[0], allDone });
+    res.status(201).json({ sale: sale.rows[0], allDone, totalRub, totalCny });
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.status) return res.status(err.status).json({ error: err.message });

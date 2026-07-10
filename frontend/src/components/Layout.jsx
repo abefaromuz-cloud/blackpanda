@@ -9,12 +9,12 @@ const navItems = [
   { to: '/',          key: 'dashboard', page: 'dashboard', icon: '◈', end: true },
   { to: '/scan',      key: 'scan',      page: 'scan',      icon: '▧' },
   { to: '/warehouse', key: 'warehouse', page: 'warehouse', icon: '▣' },
+  { to: '/arrivals',  key: 'arrivals',  page: 'arrivals',  icon: '📥' },
   { to: '/library',   key: 'library',   page: 'library',   icon: '📚' },
   { to: '/clients',   key: 'clients',   page: 'clients',   icon: '◐' },
   { to: '/preorders', key: 'preorders', page: 'preorders', icon: '▤' },
   { to: '/sales',     key: 'sales',     page: 'sales',     icon: '◆' },
-  { to: '/cash',      key: 'cash',      page: 'cash',      icon: '●' },
-  { to: '/suppliers', key: 'suppliers', page: 'suppliers', icon: '▥' },
+  { to: '/service',   key: 'service',   page: 'service',   icon: '🔧' },
   { to: '/finance',   key: 'finance',   page: 'finance',   icon: '▮' },
   { to: '/analytics', key: 'analytics', page: 'analytics', icon: '◈' },
   { to: '/reports',   key: 'reports',   page: 'reports',   icon: '▦' },
@@ -49,7 +49,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-bg">
       <aside className="w-72 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0">
         <div className="p-6 border-b border-border flex items-center gap-3">
-          <img src="/panda-logo-icon.png" alt="" className="w-10 h-10 rounded-xl object-contain bg-bg3 border border-border p-0.5 flex-shrink-0" />
+          <img src="/logo.png" alt="" className="w-10 h-10 object-contain flex-shrink-0" />
           <div className="min-w-0">
             <h1 className="text-2xl font-black leading-none tracking-tight truncate">BlackPanda</h1>
             <p className="text-[10px] text-accent2 mt-1.5 font-semibold tracking-widest uppercase">CRM</p>
@@ -85,7 +85,7 @@ export default function Layout() {
         {/* Иллюстрация — адаптивная, без фиксированной высоты, чтобы не резалась криво на разных экранах */}
         <div className="relative shrink-0 border-t border-border overflow-hidden" style={{ aspectRatio: '280 / 300' }}>
           <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(225,29,46,0.10), transparent 70%)' }} />
-          <img src="/panda-logo-full.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
+          <img src="/logo.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
             style={{ filter: 'drop-shadow(0 0 16px rgba(225,29,46,0.25))' }} />
         </div>
 

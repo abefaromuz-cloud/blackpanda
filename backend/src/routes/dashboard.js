@@ -7,20 +7,20 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
   try {
     const [stock, sales30, settings, lowStock, debts, monthly, topModels] = await Promise.all([
       pool.query(`SELECT
-          COUNT(*) FILTER (WHERE status_id='s2')  AS in_stock,
-          COUNT(*) FILTER (WHERE status_id='s1')  AS in_transit,
-          COUNT(*) FILTER (WHERE status_id='s15') AS reserved,
-          COUNT(*) FILTER (WHERE status_id='s3')  AS sold
+          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock'))   AS in_stock,
+          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='intransit')) AS in_transit,
+          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='reserved'))  AS reserved,
+          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold'))      AS sold
         FROM serials`),
       pool.query(`SELECT COALESCE(SUM(total_rub),0) AS total_rub, COUNT(*) AS count
         FROM sales WHERE created_at > now() - interval '30 days'`),
       pool.query('SELECT rate, cash_balance_rub FROM settings WHERE id=1'),
       pool.query(`
-        SELECT l.id, l.brand, l.series, COUNT(s.id) FILTER (WHERE s.status_id='s2') AS in_stock, l.low_stock_threshold
+        SELECT l.id, l.brand, l.series, COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS in_stock, l.low_stock_threshold
         FROM laptops l LEFT JOIN serials s ON s.laptop_id=l.id
         WHERE l.is_archived=false
         GROUP BY l.id
-        HAVING COUNT(s.id) FILTER (WHERE s.status_id='s2') <= l.low_stock_threshold
+        HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) <= l.low_stock_threshold
       `),
       pool.query(`SELECT id, name, debt_rub FROM clients WHERE debt_rub > 0 ORDER BY debt_rub DESC`),
       // Продажи и прибыль по месяцам за последние 6 месяцев — для графика

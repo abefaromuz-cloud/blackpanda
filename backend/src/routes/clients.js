@@ -31,7 +31,7 @@ router.get('/:id', authenticate, requirePermission('clients', 'view'), async (re
 });
 
 // Ручная корректировка баланса предоплаты клиента
-router.post('/:id/balance', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
+router.post('/:id/balance', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
   const { amount_rub, note } = req.body;
   if (!amount_rub) return res.status(400).json({ error: 'Укажите сумму' });
   const client = await pool.connect();
@@ -85,7 +85,21 @@ router.post('/:id/balance/reset', authenticate, requirePermission('clients', 'ed
 });
 
 // Погасить все открытые долги клиента разом — сумма поступает в кассу
-router.post('/:id/debts/payoff', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
+// Добавить долг клиенту вручную (не привязан к продаже) — используется в блоке "Операция" на Финансах
+router.post('/:id/debts', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
+  const { amount_rub, due_date, note } = req.body;
+  if (!amount_rub || Number(amount_rub) <= 0) return res.status(400).json({ error: 'Укажите сумму долга' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO debts (client_id, amount_rub, due_date) VALUES ($1,$2,$3) RETURNING *',
+      [req.params.id, amount_rub, due_date || null]
+    );
+    await logActivity(req.user, 'Добавлен долг клиенту', 'debt', Math.round(amount_rub).toLocaleString('ru-RU') + ' ₽' + (note ? ' — ' + note : ''));
+    res.status(201).json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
+router.post('/:id/debts/payoff', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

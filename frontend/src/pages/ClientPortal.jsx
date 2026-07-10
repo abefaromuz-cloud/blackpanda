@@ -17,7 +17,7 @@ export default function ClientPortal() {
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
-            <img src="/panda-logo-icon.png" alt="" className="w-8 h-8 rounded-lg object-contain bg-bg3 border border-border p-0.5" />
+            <img src="/logo.png" alt="" className="w-8 h-8 object-contain" />
             <div className="text-lg font-black">BlackPanda</div>
           </div>
           <div className="flex gap-2">

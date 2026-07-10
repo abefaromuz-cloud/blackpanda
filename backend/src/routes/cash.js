@@ -14,21 +14,28 @@ router.get('/', authenticate, requirePermission('cash', 'view'), async (req, res
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
-// Ручная операция (расход/приход, не связанный напрямую с продажей — например, закупка или личные нужды)
-router.post('/', authenticate, requirePermission('cash', 'edit'), async (req, res) => {
-  const { type, amount_rub, note, client_id, category } = req.body;
+// Универсальная кассовая операция: приход/расход, наличными или на/со счёта, включая сдачу обменнику
+router.post('/', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
+  const { type, dest, amount_rub, note, client_id, category, recipient } = req.body;
   if (!['in', 'out'].includes(type) || !amount_rub) return res.status(400).json({ error: 'Укажите тип и сумму' });
+  const isCash = !dest || dest === 'cash';
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const delta = type === 'in' ? Number(amount_rub) : -Number(amount_rub);
-    await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [delta]);
+    if (isCash) {
+      await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [delta]);
+    } else {
+      await client.query('UPDATE bank_accounts SET balance_rub = balance_rub + $1 WHERE key=$2', [delta, dest]);
+    }
     const entry = await client.query(
-      'INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [type, amount_rub, note || null, client_id || null, category || 'other']
+      `INSERT INTO cash_log (type, amount_rub, note, client_id, category, bank_key, recipient)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [type, amount_rub, note || null, client_id || null, category || 'other', isCash ? null : dest, recipient || null]
     );
     await client.query('COMMIT');
-    await logActivity(req.user, type === 'in' ? 'Приход в кассу' : 'Расход из кассы', 'cash', Math.round(amount_rub).toLocaleString('ru-RU') + ' ₽');
+    const label = category === 'exchanger' ? `Сдача обменнику${recipient ? ' (' + recipient + ')' : ''}` : (type === 'in' ? 'Приход в кассу' : 'Расход из кассы');
+    await logActivity(req.user, label, 'cash', Math.round(amount_rub).toLocaleString('ru-RU') + ' ₽');
     res.status(201).json(entry.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');

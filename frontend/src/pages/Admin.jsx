@@ -6,9 +6,9 @@ import DragReorderList from '../components/DragReorderList';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
-  'suppliers', 'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library'];
-const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preorders', 'sales', 'cash', 'suppliers',
-  'finance', 'analytics', 'reports', 'broadcast', 'import', 'employees', 'activity_log', 'settings'];
+  'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library', 'arrivals', 'service'];
+const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preorders', 'sales',
+  'finance', 'analytics', 'reports', 'broadcast', 'import', 'employees', 'activity_log', 'settings', 'arrivals', 'service'];
 
 export default function Admin() {
   const { t, lang } = useLang();

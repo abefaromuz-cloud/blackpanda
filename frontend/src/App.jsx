@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import VideoIntro from './components/VideoIntro';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Warehouse from './pages/Warehouse';
@@ -13,7 +15,6 @@ import Cash from './pages/Cash';
 import Settings from './pages/Settings';
 import Admin from './pages/Admin';
 import ClientPortal from './pages/ClientPortal';
-import Suppliers from './pages/Suppliers';
 import Employees from './pages/Employees';
 import Finance from './pages/Finance';
 import Analytics from './pages/Analytics';
@@ -24,6 +25,8 @@ import Scan from './pages/Scan';
 import Broadcast from './pages/Broadcast';
 import Library from './pages/Library';
 import SerialDetail from './pages/SerialDetail';
+import Arrivals from './pages/Arrivals';
+import Service from './pages/Service';
 import { useAuth } from './auth/AuthContext';
 import { useLang } from './i18n/LangContext';
 
@@ -56,6 +59,10 @@ function ClientGuard({ children }) {
 }
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
+
+  if (showIntro) return <VideoIntro onDone={() => setShowIntro(false)} />;
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -72,7 +79,6 @@ export default function App() {
         <Route path="sales" element={<PermGuard page="sales"><Sales /></PermGuard>} />
         <Route path="cash" element={<PermGuard page="cash"><Cash /></PermGuard>} />
         <Route path="settings" element={<PermGuard page="settings"><Settings /></PermGuard>} />
-        <Route path="suppliers" element={<PermGuard page="suppliers"><Suppliers /></PermGuard>} />
         <Route path="employees" element={<PermGuard page="employees"><Employees /></PermGuard>} />
         <Route path="finance" element={<PermGuard page="finance"><Finance /></PermGuard>} />
         <Route path="analytics" element={<PermGuard page="analytics"><Analytics /></PermGuard>} />
@@ -82,6 +88,8 @@ export default function App() {
         <Route path="scan" element={<PermGuard page="scan"><Scan /></PermGuard>} />
         <Route path="broadcast" element={<PermGuard page="broadcast"><Broadcast /></PermGuard>} />
         <Route path="library" element={<PermGuard page="library"><Library /></PermGuard>} />
+        <Route path="arrivals" element={<PermGuard page="arrivals"><Arrivals /></PermGuard>} />
+        <Route path="service" element={<PermGuard page="service"><Service /></PermGuard>} />
         <Route path="admin" element={<AdminGuard><Admin /></AdminGuard>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

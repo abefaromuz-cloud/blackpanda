@@ -4,6 +4,57 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 
+function LegacyImportBlock({ canEdit }) {
+  const [fileName, setFileName] = useState('');
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFileName(file.name); setErr(''); setResult(null);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      setLoading(true);
+      try {
+        const data = JSON.parse(ev.target.result);
+        const { data: res } = await api.post('/import/legacy-backup', data);
+        setResult(res.counts);
+      } catch (e2) {
+        setErr(e2.response?.data?.error || 'Не удалось разобрать файл — убедись, что это JSON-бэкап из старой версии');
+      } finally { setLoading(false); }
+    };
+    reader.readAsText(file);
+  }
+
+  return (
+    <div className="card mb-5 border-accent/40">
+      <div className="font-bold text-sm mb-2">🐼 Импорт из старой версии (HTML/Firebase)</div>
+      <div className="text-xs text-text3 mb-3">
+        В старой CRM нажми «Бэкап данных» — скачается файл вида <code className="text-accent2">BlackPanda_backup_....json</code>.
+        Загрузи его сюда — перенесутся клиенты, склад, серийники, продажи, касса, курс и банковские счета.
+        <br /><b className="text-yellow">Запускай только один раз</b> — при повторном запуске клиенты и продажи продублируются
+        (серийники защищены от дублей уникальным номером).
+      </div>
+      {canEdit && (
+        <label className="btn btn-primary inline-block cursor-pointer">
+          {loading ? 'Импортируем...' : '📁 Выбрать файл бэкапа'}
+          <input type="file" accept=".json" className="hidden" onChange={handleFile} disabled={loading} />
+        </label>
+      )}
+      {fileName && <div className="text-xs text-text3 mt-2">Файл: {fileName}</div>}
+      {err && <div className="mt-3 text-sm text-red">{err}</div>}
+      {result && (
+        <div className="mt-3 text-sm text-green">
+          ✅ Импортировано: клиентов — {result.clients}, моделей — {result.laptops}, серийников — {result.serials},
+          продаж — {result.sales}, записей кассы — {result.cash}, долгов — {result.debts}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ImportBlock({ title, columns, endpoint, mapRow, t, canEdit }) {
   const [csv, setCsv] = useState('');
   const [rows, setRows] = useState([]);
@@ -55,6 +106,7 @@ export default function Import() {
   return (
     <div>
       <h1 className="text-2xl font-black mb-6">{t('importPage')}</h1>
+      <LegacyImportBlock canEdit={canEdit} />
       <ImportBlock
         title={t('importClients')}
         columns={['name', 'phone', 'telegram']}

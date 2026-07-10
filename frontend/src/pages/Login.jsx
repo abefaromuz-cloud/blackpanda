@@ -32,7 +32,7 @@ export default function Login() {
       <form onSubmit={submit} className="card w-full max-w-sm relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-accent/10 blur-2xl" />
         <div className="flex items-center gap-3 mb-6 relative">
-          <img src="/panda-logo-icon.png" alt="" className="w-11 h-11 rounded-xl object-contain bg-bg3 border border-border p-1" />
+          <img src="/logo.png" alt="" className="w-12 h-12 object-contain" />
           <div>
             <div className="text-xl font-black tracking-tight">BlackPanda</div>
             <div className="text-[11px] text-text3 uppercase tracking-wider">CRM</div>

@@ -8,9 +8,9 @@ const router = express.Router();
 // Сгенерировать текст со списком товаров в наличии (для рассылки "склад актуальный")
 router.get('/stock-message', authenticate, requirePermission('broadcast', 'view'), async (req, res) => {
   const laptops = await pool.query(`
-    SELECT l.*, COUNT(s.id) FILTER (WHERE s.status_id='s2') AS in_stock
+    SELECT l.*, COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS in_stock
     FROM laptops l LEFT JOIN serials s ON s.laptop_id=l.id
-    WHERE l.is_archived=false GROUP BY l.id HAVING COUNT(s.id) FILTER (WHERE s.status_id='s2') > 0
+    WHERE l.is_archived=false GROUP BY l.id HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) > 0
     ORDER BY l.brand, l.series
   `);
   const settings = await pool.query('SELECT rate FROM settings WHERE id=1');
