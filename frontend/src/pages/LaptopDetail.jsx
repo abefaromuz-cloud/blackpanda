@@ -318,7 +318,6 @@ export default function LaptopDetail() {
       </div>
 
       {showCamera && <BarcodeScannerModal onResult={addFromCamera} onClose={() => setShowCamera(false)} />}
-      </div>
     </div>
   );
 }
