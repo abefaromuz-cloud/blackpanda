@@ -9,39 +9,20 @@ const CATS = [
   ['storage', 'storages'], ['color', 'colors'], ['screen', 'screens'],
 ];
 
-// Инлайн-редактируемое поле — сохраняет по потере фокуса/Enter.
+// Инлайн-редактируемое поле — сохраняет по потере фокуса/Enter. w-full — растягивается на всю
+// свою колонку сетки (а колонка задаётся один раз на весь список, поэтому все поля одной ширины).
 function EditableField({ value, onSave, placeholder }) {
   const [v, setV] = useState(value || '');
   useEffect(() => { setV(value || ''); }, [value]);
   return (
     <input
-      className="inp inp-sm truncate min-w-0 w-36 flex-shrink-0"
+      className="inp inp-sm truncate w-full min-w-0"
       placeholder={placeholder}
       value={v}
       onChange={e => setV(e.target.value)}
       onBlur={() => { if (v !== (value || '')) onSave(v); }}
       onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
     />
-  );
-}
-
-// Пара «оригинал ⚭ китайский» — одинаковая ширина у обоих полей, стоят вплотную,
-// между ними значок связи, чтобы было видно, что это перевод именно этого значения.
-function BilingualPair({ name, nameZh, onSaveName, onSaveZh, canEdit, staticName }) {
-  if (!canEdit) {
-    return (
-      <span className="flex items-center gap-2 min-w-0">
-        <span className="truncate">{staticName ?? name}</span>
-        {nameZh && <span className="text-text3 text-xs truncate">⚭ {nameZh}</span>}
-      </span>
-    );
-  }
-  return (
-    <span className="flex items-center gap-1.5 flex-shrink-0">
-      <EditableField value={name} onSave={onSaveName} />
-      <span className="text-text3 text-xs flex-shrink-0" title="Перевод этого значения">⚭</span>
-      <EditableField value={nameZh} onSave={onSaveZh} placeholder="中文" />
-    </span>
   );
 }
 
@@ -103,75 +84,81 @@ export default function Library() {
 
   if (!data) return <div className="text-text3">{t('loading')}</div>;
 
+  // Одна сетка колонок на ВЕСЬ список сразу (а не по строке) — гарантирует, что название и 中文
+  // всегда одной ширины и растянуты на всю доступную ширину, независимо от строки и текста внутри.
+  // 1fr + 1fr = поля равны и делят между собой ~85% ширины, адаптивно под любой экран.
+  const gridCols = 'grid-cols-[20px_1fr_20px_1fr_auto]';
+
   return (
     <div>
       <h1 className="text-2xl font-black mb-1">📚 {t('library')}</h1>
       <div className="text-xs text-text3 mb-5">
         Всё остальное в интерфейсе уже переведено автоматически. Здесь — то, что пишешь сам: бренды, серии,
-        характеристики, статусы. Поля «оригинал ⚭ 中文» стоят парой — правишь любое, клик мимо (или Enter) — сохранится.
+        характеристики, статусы. Поля «оригинал ⚭ 中文» — одной ширины, растянуты на всю строку.
       </div>
 
       <div className="card mb-4">
         <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
           <div className="font-bold text-sm">🏷️ {t('brandsAndSeries')}</div>
           {canEdit && (
-            <form onSubmit={addBrand} className="flex items-center gap-1.5">
-              <input className="inp inp-sm w-36" placeholder="Название" value={newBrand.name} onChange={e => setNewBrand(b => ({ ...b, name: e.target.value }))} />
-              <span className="text-text3 text-xs">⚭</span>
-              <input className="inp inp-sm w-36" placeholder="中文" value={newBrand.name_zh} onChange={e => setNewBrand(b => ({ ...b, name_zh: e.target.value }))} />
+            <form onSubmit={addBrand} className={`grid ${gridCols} gap-2 items-center w-full sm:w-auto sm:min-w-[420px]`}>
+              <span />
+              <input className="inp inp-sm" placeholder="Название" value={newBrand.name} onChange={e => setNewBrand(b => ({ ...b, name: e.target.value }))} />
+              <span className="text-text3 text-xs text-center">⚭</span>
+              <input className="inp inp-sm" placeholder="中文" value={newBrand.name_zh} onChange={e => setNewBrand(b => ({ ...b, name_zh: e.target.value }))} />
               <button className="btn btn-primary btn-sm">{t('addBrand')}</button>
             </form>
           )}
         </div>
 
-        <DragReorderList
-          items={data.brands}
-          getKey={b => b.id}
-          onReorder={reorderBrands}
-          renderItem={(b, handleProps) => (
-            <div className="border-t border-border pt-2">
-              <div className="flex justify-between items-center gap-2">
-                <span className="flex items-center gap-2 min-w-0">
-                  {canEdit && <span {...handleProps} className="text-text3 select-none flex-shrink-0">⠿</span>}
-                  <BilingualPair name={b.name} nameZh={b.name_zh} canEdit={canEdit}
-                    onSaveName={(v) => saveBrand(b.id, { name: v })} onSaveZh={(v) => saveBrand(b.id, { name_zh: v })}
-                    staticName={<span className="font-bold text-sm">{b.name}</span>} />
-                </span>
-                {canEdit && <button className="text-red text-xs hover:underline flex-shrink-0" onClick={() => delBrand(b.id)}>{t('delete')}</button>}
-              </div>
-              <div className="pl-3">
+        <div className={`grid ${gridCols} gap-x-2 gap-y-1.5`}>
+          <DragReorderList
+            items={data.brands}
+            getKey={b => b.id}
+            onReorder={reorderBrands}
+            className="contents"
+            renderItem={(b, handleProps) => (
+              <>
+                {canEdit ? <span {...handleProps} className="text-text3 select-none">⠿</span> : <span />}
+                {canEdit ? <EditableField value={b.name} onSave={(v) => saveBrand(b.id, { name: v })} /> : <span className="font-bold text-sm truncate">{b.name}</span>}
+                <span className="text-text3 text-xs text-center">⚭</span>
+                {canEdit ? <EditableField value={b.name_zh} onSave={(v) => saveBrand(b.id, { name_zh: v })} placeholder="中文" /> : <span className="text-text3 text-xs truncate">{b.name_zh}</span>}
+                {canEdit && <button className="text-red text-xs hover:underline whitespace-nowrap" onClick={() => delBrand(b.id)}>{t('delete')}</button>}
+
                 <DragReorderList
                   items={b.series}
                   getKey={s => s.id}
                   onReorder={reorderSeries}
+                  className="contents"
                   renderItem={(s, seriesHandle) => (
-                    <div className="flex justify-between items-center gap-2 text-xs text-text2 py-1">
-                      <span className="flex items-center gap-2 min-w-0">
-                        {canEdit && <span {...seriesHandle} className="text-text3 select-none flex-shrink-0">⠿</span>}
-                        <BilingualPair name={s.name} nameZh={s.name_zh} canEdit={canEdit}
-                          onSaveName={(v) => saveSeries(s.id, { name: v })} onSaveZh={(v) => saveSeries(s.id, { name_zh: v })} />
-                      </span>
-                      {canEdit && <button className="text-text3 hover:text-red flex-shrink-0" onClick={() => delSeries(s.id)}>✕</button>}
-                    </div>
+                    <>
+                      {canEdit ? <span {...seriesHandle} className="text-text3 select-none pl-3">⠿</span> : <span />}
+                      {canEdit ? <EditableField value={s.name} onSave={(v) => saveSeries(s.id, { name: v })} /> : <span className="text-xs text-text2 truncate pl-3">{s.name}</span>}
+                      <span className="text-text3 text-xs text-center">⚭</span>
+                      {canEdit ? <EditableField value={s.name_zh} onSave={(v) => saveSeries(s.id, { name_zh: v })} placeholder="中文" /> : <span className="text-text3 text-xs truncate">{s.name_zh}</span>}
+                      {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delSeries(s.id)}>✕</button>}
+                    </>
                   )}
                 />
+
                 {canEdit && (
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="w-4 flex-shrink-0" />
-                    <input className="inp inp-sm truncate min-w-0 w-36 flex-shrink-0" placeholder={t('addSeries')} value={newSeries[b.id]?.name || ''}
+                  <>
+                    <span className="pl-3 text-text3 text-xs">＋</span>
+                    <input className="inp inp-sm truncate w-full min-w-0" placeholder={t('addSeries')} value={newSeries[b.id]?.name || ''}
                       onChange={e => setNewSeries(s => ({ ...s, [b.id]: { ...s[b.id], name: e.target.value } }))}
                       onKeyDown={e => e.key === 'Enter' && addSeries(b.id)} />
-                    <span className="text-text3 text-xs flex-shrink-0">⚭</span>
-                    <input className="inp inp-sm truncate min-w-0 w-36 flex-shrink-0" placeholder="中文" value={newSeries[b.id]?.name_zh || ''}
+                    <span className="text-text3 text-xs text-center">⚭</span>
+                    <input className="inp inp-sm truncate w-full min-w-0" placeholder="中文" value={newSeries[b.id]?.name_zh || ''}
                       onChange={e => setNewSeries(s => ({ ...s, [b.id]: { ...s[b.id], name_zh: e.target.value } }))}
                       onKeyDown={e => e.key === 'Enter' && addSeries(b.id)} />
-                    <button className="text-accent2 text-xs hover:underline flex-shrink-0" onClick={() => addSeries(b.id)}>+</button>
-                  </div>
+                    <button className="text-accent2 text-xs hover:underline" onClick={() => addSeries(b.id)}>+</button>
+                  </>
                 )}
-              </div>
-            </div>
-          )}
-        />
+                <div className="col-span-5 border-b border-border my-1" />
+              </>
+            )}
+          />
+        </div>
       </div>
 
       <div className="card mb-4">
@@ -198,32 +185,33 @@ export default function Library() {
           «Не считать в остатках» — статус просто для информации (например, «На ремонте», «Потерян»).
           Переименование статуса автоматически перенесётся на уже сохранённые товары с этим статусом.
         </div>
-        <DragReorderList
-          items={data.statuses}
-          getKey={s => s.id}
-          onReorder={reorderStatuses}
-          renderItem={(s, handleProps) => (
-            <div className="flex justify-between items-center gap-2 text-sm py-1.5 border-b border-border last:border-0">
-              <span className="flex items-center gap-2 min-w-0">
-                {canEdit && <span {...handleProps} className="text-text3 select-none flex-shrink-0">⠿</span>}
-                <BilingualPair name={s.label} nameZh={s.label_zh} canEdit={canEdit}
-                  onSaveName={(v) => saveStatus(s.id, { label: v })} onSaveZh={(v) => saveStatus(s.id, { label_zh: v })} />
-              </span>
-              <span className="flex items-center gap-2 flex-shrink-0">
+        <div className="grid grid-cols-[20px_1fr_20px_1fr_128px_20px] gap-x-2 gap-y-1.5 text-sm">
+          <DragReorderList
+            items={data.statuses}
+            getKey={s => s.id}
+            onReorder={reorderStatuses}
+            className="contents"
+            renderItem={(s, handleProps) => (
+              <>
+                {canEdit ? <span {...handleProps} className="text-text3 select-none">⠿</span> : <span />}
+                {canEdit ? <EditableField value={s.label} onSave={(v) => saveStatus(s.id, { label: v })} /> : <span className="truncate">{s.label}</span>}
+                <span className="text-text3 text-xs text-center">⚭</span>
+                {canEdit ? <EditableField value={s.label_zh} onSave={(v) => saveStatus(s.id, { label_zh: v })} placeholder="中文" /> : <span className="text-text3 text-xs truncate">{s.label_zh}</span>}
                 {canEdit ? (
-                  <select className="inp inp-sm w-32" value={s.counts_as} onChange={e => saveStatus(s.id, { counts_as: e.target.value })}>
+                  <select className="inp inp-sm" value={s.counts_as} onChange={e => saveStatus(s.id, { counts_as: e.target.value })}>
                     <option value="instock">в наличии</option>
                     <option value="intransit">в пути</option>
                     <option value="reserved">резерв</option>
                     <option value="sold">продано</option>
                     <option value="other">не считать</option>
                   </select>
-                ) : <span className="badge badge-blue text-[10px]">{s.counts_as}</span>}
+                ) : <span className="badge badge-blue text-[10px] justify-self-start">{s.counts_as}</span>}
                 {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delStatus(s.id)}>✕</button>}
-              </span>
-            </div>
-          )}
-        />
+                <div className="col-span-6 border-b border-border" />
+              </>
+            )}
+          />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -231,31 +219,35 @@ export default function Library() {
           <div key={cat} className="card">
             <div className="font-bold text-sm mb-3">{t(labelKey)}</div>
             <div className="max-h-56 overflow-y-auto mb-2">
-              <DragReorderList
-                items={data.values[cat] || []}
-                getKey={v => v.id}
-                onReorder={(ids) => reorderValues(ids)}
-                renderItem={(v, handleProps) => (
-                  <div className="flex justify-between items-center gap-2 text-sm py-1 border-b border-border last:border-0">
-                    <span className="flex items-center gap-2 min-w-0">
-                      {canEdit && <span {...handleProps} className="text-text3 select-none flex-shrink-0">⠿</span>}
-                      <BilingualPair name={v.value} nameZh={v.value_zh} canEdit={canEdit}
-                        onSaveName={(val) => saveValue(v.id, { value: val })} onSaveZh={(val) => saveValue(v.id, { value_zh: val })} />
-                    </span>
-                    {canEdit && <button className="text-text3 hover:text-red text-xs flex-shrink-0" onClick={() => delValue(v.id)}>✕</button>}
-                  </div>
-                )}
-              />
+              <div className={`grid ${gridCols} gap-x-2 gap-y-1 text-sm`}>
+                <DragReorderList
+                  items={data.values[cat] || []}
+                  getKey={v => v.id}
+                  onReorder={(ids) => reorderValues(ids)}
+                  className="contents"
+                  renderItem={(v, handleProps) => (
+                    <>
+                      {canEdit ? <span {...handleProps} className="text-text3 select-none">⠿</span> : <span />}
+                      {canEdit ? <EditableField value={v.value} onSave={(val) => saveValue(v.id, { value: val })} /> : <span className="truncate">{v.value}</span>}
+                      <span className="text-text3 text-xs text-center">⚭</span>
+                      {canEdit ? <EditableField value={v.value_zh} onSave={(val) => saveValue(v.id, { value_zh: val })} placeholder="中文" /> : <span className="text-text3 text-xs truncate">{v.value_zh}</span>}
+                      {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delValue(v.id)}>✕</button>}
+                      <div className="col-span-5 border-b border-border" />
+                    </>
+                  )}
+                />
+              </div>
               {!(data.values[cat] || []).length && <div className="text-text3 text-xs">—</div>}
             </div>
             {canEdit && (
-              <div className="flex items-center gap-1.5">
-                <input className="inp inp-sm truncate min-w-0 flex-1" value={newValue[cat]?.value || ''} onChange={e => setNewValue(s => ({ ...s, [cat]: { ...s[cat], value: e.target.value } }))}
+              <div className={`grid ${gridCols} gap-2 items-center`}>
+                <span />
+                <input className="inp inp-sm truncate w-full min-w-0" value={newValue[cat]?.value || ''} onChange={e => setNewValue(s => ({ ...s, [cat]: { ...s[cat], value: e.target.value } }))}
                   onKeyDown={e => e.key === 'Enter' && addValue(cat)} />
-                <span className="text-text3 text-xs flex-shrink-0">⚭</span>
-                <input className="inp inp-sm truncate min-w-0 w-28 flex-shrink-0" placeholder="中文" value={newValue[cat]?.value_zh || ''} onChange={e => setNewValue(s => ({ ...s, [cat]: { ...s[cat], value_zh: e.target.value } }))}
+                <span className="text-text3 text-xs text-center">⚭</span>
+                <input className="inp inp-sm truncate w-full min-w-0" placeholder="中文" value={newValue[cat]?.value_zh || ''} onChange={e => setNewValue(s => ({ ...s, [cat]: { ...s[cat], value_zh: e.target.value } }))}
                   onKeyDown={e => e.key === 'Enter' && addValue(cat)} />
-                <button className="btn btn-secondary btn-xs flex-shrink-0" onClick={() => addValue(cat)}>{t('addValue')}</button>
+                <button className="btn btn-secondary btn-xs" onClick={() => addValue(cat)}>{t('addValue')}</button>
               </div>
             )}
           </div>

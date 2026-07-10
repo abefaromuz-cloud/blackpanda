@@ -41,7 +41,7 @@ export default function DragReorderList({ items, getKey, renderItem, onReorder, 
       {list.map(item => {
         const key = getKey(item);
         return (
-          <div key={key} data-drag-key={key} className={draggingKey === key ? 'opacity-40' : ''}>
+          <div key={key} data-drag-key={key} style={{ display: 'contents' }}>
             {renderItem(item, { onPointerDown: (e) => onPointerDown(e, key), style: { touchAction: 'none', cursor: 'grab' } })}
           </div>
         );
