@@ -49,7 +49,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-bg">
       <aside className="w-72 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-border flex items-center gap-2.5">
-          <img src="/logo.png" alt="" className="w-9 h-9 object-contain flex-shrink-0" />
+          <img src="/logo.png" alt="" className="h-14 w-auto object-contain flex-shrink-0" />
           <div className="min-w-0">
             <h1 className="text-xl font-black leading-none tracking-tight truncate">BlackPanda</h1>
             <p className="text-[10px] text-accent2 mt-1 font-semibold tracking-widest uppercase">CRM</p>
