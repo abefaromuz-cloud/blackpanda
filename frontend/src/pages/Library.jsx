@@ -16,7 +16,7 @@ function EditableField({ value, onSave, placeholder, className = '' }) {
   useEffect(() => { setV(value || ''); }, [value]);
   return (
     <input
-      className={`inp inp-sm truncate ${className}`}
+      className={`inp inp-sm truncate min-w-0 w-full ${className}`}
       placeholder={placeholder}
       value={v}
       onChange={e => setV(e.target.value)}
@@ -140,10 +140,10 @@ export default function Library() {
                 {canEdit && (
                   <div className={`${gridSeries} mt-1`}>
                     <span />
-                    <input className="inp inp-sm truncate" placeholder={t('addSeries')} value={newSeries[b.id]?.name || ''}
+                    <input className="inp inp-sm truncate min-w-0 w-full" placeholder={t('addSeries')} value={newSeries[b.id]?.name || ''}
                       onChange={e => setNewSeries(s => ({ ...s, [b.id]: { ...s[b.id], name: e.target.value } }))}
                       onKeyDown={e => e.key === 'Enter' && addSeries(b.id)} />
-                    <input className="inp inp-sm truncate" placeholder="中文" value={newSeries[b.id]?.name_zh || ''}
+                    <input className="inp inp-sm truncate min-w-0 w-full" placeholder="中文" value={newSeries[b.id]?.name_zh || ''}
                       onChange={e => setNewSeries(s => ({ ...s, [b.id]: { ...s[b.id], name_zh: e.target.value } }))}
                       onKeyDown={e => e.key === 'Enter' && addSeries(b.id)} />
                     <button className="text-accent2 text-xs hover:underline" onClick={() => addSeries(b.id)}>+</button>
