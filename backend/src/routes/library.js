@@ -58,12 +58,32 @@ router.put('/statuses/reorder', authenticate, requirePermission('library', 'edit
 });
 
 router.put('/statuses/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
-  const { label_zh, counts_as } = req.body;
-  const result = await pool.query(
-    'UPDATE lib_statuses SET label_zh=COALESCE($1,label_zh), counts_as=COALESCE($2,counts_as) WHERE id=$3 RETURNING *',
-    [label_zh ?? null, counts_as || null, req.params.id]
-  );
-  res.json(result.rows[0]);
+  const { label, label_zh, counts_as } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query('SELECT label FROM lib_statuses WHERE id=$1', [req.params.id]);
+    if (!current.rows[0]) throw { status: 404, message: 'Не найдено' };
+    const oldLabel = current.rows[0].label;
+    const newLabel = label?.trim() || oldLabel;
+
+    const result = await client.query(
+      'UPDATE lib_statuses SET label=$1, label_zh=COALESCE($2,label_zh), counts_as=COALESCE($3,counts_as) WHERE id=$4 RETURNING *',
+      [newLabel, label_zh ?? null, counts_as || null, req.params.id]
+    );
+    // Если название поменялось — переносим статус у уже сохранённых серийников, чтобы не "осиротить" их
+    if (newLabel !== oldLabel) {
+      await client.query('UPDATE serials SET status_id=$1 WHERE status_id=$2', [newLabel, oldLabel]);
+      await client.query('UPDATE serial_history SET status_id=$1 WHERE status_id=$2', [newLabel, oldLabel]);
+    }
+    await client.query('COMMIT');
+    res.json(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.code === '23505') return res.status(409).json({ error: 'Такой статус уже есть' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  } finally { client.release(); }
 });
 
 router.delete('/statuses/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
@@ -98,9 +118,17 @@ router.put('/brands/reorder', authenticate, requirePermission('library', 'edit')
 });
 
 router.put('/brands/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
-  const { name_zh } = req.body;
-  const result = await pool.query('UPDATE lib_brands SET name_zh=$1 WHERE id=$2 RETURNING *', [name_zh ?? null, req.params.id]);
-  res.json(result.rows[0]);
+  const { name, name_zh } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE lib_brands SET name=COALESCE($1,name), name_zh=COALESCE($2,name_zh) WHERE id=$3 RETURNING *',
+      [name?.trim() || null, name_zh ?? null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Такой бренд уже есть' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 router.delete('/brands/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
@@ -135,9 +163,17 @@ router.put('/series/reorder', authenticate, requirePermission('library', 'edit')
 });
 
 router.put('/series/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
-  const { name_zh } = req.body;
-  const result = await pool.query('UPDATE lib_series SET name_zh=$1 WHERE id=$2 RETURNING *', [name_zh ?? null, req.params.id]);
-  res.json(result.rows[0]);
+  const { name, name_zh } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE lib_series SET name=COALESCE($1,name), name_zh=COALESCE($2,name_zh) WHERE id=$3 RETURNING *',
+      [name?.trim() || null, name_zh ?? null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Такая серия уже есть' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 router.delete('/series/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
@@ -172,9 +208,17 @@ router.put('/values/reorder', authenticate, requirePermission('library', 'edit')
 });
 
 router.put('/values/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
-  const { value_zh } = req.body;
-  const result = await pool.query('UPDATE lib_values SET value_zh=$1 WHERE id=$2 RETURNING *', [value_zh ?? null, req.params.id]);
-  res.json(result.rows[0]);
+  const { value, value_zh } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE lib_values SET value=COALESCE($1,value), value_zh=COALESCE($2,value_zh) WHERE id=$3 RETURNING *',
+      [value?.trim() || null, value_zh ?? null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Такое значение уже есть' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 router.delete('/values/:id', authenticate, requirePermission('library', 'edit'), async (req, res) => {
