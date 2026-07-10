@@ -15,7 +15,8 @@
     "axios": "^1.7.2",
     "recharts": "^2.12.7",
     "papaparse": "^5.4.1",
-    "@zxing/library": "^0.21.3"
+    "@zxing/library": "^0.21.3",
+    "lucide-react": "^0.383.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

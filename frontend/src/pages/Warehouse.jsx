@@ -8,7 +8,7 @@ import { useLibraryText } from '../hooks/useLibraryText';
 
 const emptyForm = {
   brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: 'no',
-  images: [''], cost_cny: '', price_sell_cny: '', low_stock_threshold: 2, is_hot: false,
+  images: [''], cost_cny: '', price_sell_cny: '', low_stock_threshold: 2, is_hot: false, mfr_item_code: '',
 };
 
 function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort(); }
@@ -138,7 +138,7 @@ export default function Warehouse() {
 
   const filtered = useMemo(() => {
     let list = laptops.filter(l => {
-      if (search && !`${l.brand} ${l.series} ${l.cpu} ${l.ram} ${l.gpu} ${l.storage} ${l.color} ${l.screen}`.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search && !`${l.brand} ${l.series} ${l.cpu} ${l.ram} ${l.gpu} ${l.storage} ${l.color} ${l.screen} ${l.item_code || ''} ${l.mfr_item_code || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
       if (filters.brand && l.brand !== filters.brand) return false;
       if (filters.series && l.series !== filters.series) return false;
       if (filters.cpu && l.cpu !== filters.cpu) return false;
@@ -244,6 +244,7 @@ export default function Warehouse() {
               {form.price_sell_cny && rate > 0 && <div className="text-xs text-text3 mt-1">≈ {Math.round(form.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>}
             </div>
             <input className="inp" type="number" placeholder="Мин. остаток (уведомление)" value={form.low_stock_threshold} onChange={e => setForm(f => ({ ...f, low_stock_threshold: e.target.value }))} />
+            <input className="inp" placeholder="ITEM (код с коробки производителя)" value={form.mfr_item_code} onChange={e => setForm(f => ({ ...f, mfr_item_code: e.target.value }))} />
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_hot} onChange={e => setForm(f => ({ ...f, is_hot: e.target.checked }))} /> 🔥 Хит продаж</label>
           </div>
           <div className="mb-3">
@@ -261,7 +262,7 @@ export default function Warehouse() {
       )}
 
       <div className="flex gap-2 flex-wrap mb-3">
-        <input className="inp flex-1 min-w-[160px]" placeholder="Поиск... (в т.ч. по серийному номеру)" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="inp flex-1 min-w-[160px]" placeholder="Поиск... (серийник, ITEM, ID модели)" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       {serialMatches.length > 0 && (
@@ -323,6 +324,7 @@ export default function Warehouse() {
                       {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
                     </Link>
                     <div className="text-xs text-text3">{[tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage)].filter(Boolean).join(' · ')}</div>
+                    {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
                   </td>
                   <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
                   <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>

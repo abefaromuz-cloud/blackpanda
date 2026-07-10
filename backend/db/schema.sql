@@ -241,7 +241,13 @@ CREATE TABLE IF NOT EXISTS activity_log (
 CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
 
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS is_hot BOOLEAN NOT NULL DEFAULT false;
+CREATE SEQUENCE IF NOT EXISTS laptop_item_seq START 1;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS item_code TEXT UNIQUE;
+ALTER TABLE laptops ALTER COLUMN item_code SET DEFAULT ('LAP-' || to_char(now(),'YYYY') || '-' || lpad(nextval('laptop_item_seq')::text, 4, '0'));
+UPDATE laptops SET item_code = 'LAP-' || to_char(created_at,'YYYY') || '-' || lpad(nextval('laptop_item_seq')::text, 4, '0')
+  WHERE item_code IS NULL;
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS mfr_item_code TEXT;
 
 -- Справочник: бренды и их серии
 CREATE TABLE IF NOT EXISTS lib_brands (

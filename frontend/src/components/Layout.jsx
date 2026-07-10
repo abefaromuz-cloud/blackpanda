@@ -1,28 +1,33 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import {
+  LayoutDashboard, ScanLine, Warehouse, PackagePlus, Library, Users,
+  ClipboardList, ShoppingCart, Wrench, Wallet, BarChart3, FileText,
+  Megaphone, Upload, UserCog, History, Settings, ShieldCheck,
+} from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels } from '../i18n/translations';
 import api from '../api/client';
 
 const navItems = [
-  { to: '/',          key: 'dashboard', page: 'dashboard', icon: '◈', end: true },
-  { to: '/scan',      key: 'scan',      page: 'scan',      icon: '▧' },
-  { to: '/warehouse', key: 'warehouse', page: 'warehouse', icon: '▣' },
-  { to: '/arrivals',  key: 'arrivals',  page: 'arrivals',  icon: '📥' },
-  { to: '/library',   key: 'library',   page: 'library',   icon: '📚' },
-  { to: '/clients',   key: 'clients',   page: 'clients',   icon: '◐' },
-  { to: '/preorders', key: 'preorders', page: 'preorders', icon: '▤' },
-  { to: '/sales',     key: 'sales',     page: 'sales',     icon: '◆' },
-  { to: '/service',   key: 'service',   page: 'service',   icon: '🔧' },
-  { to: '/finance',   key: 'finance',   page: 'finance',   icon: '▮' },
-  { to: '/analytics', key: 'analytics', page: 'analytics', icon: '◈' },
-  { to: '/reports',   key: 'reports',   page: 'reports',   icon: '▦' },
-  { to: '/broadcast', key: 'broadcast', page: 'broadcast', icon: '📢' },
-  { to: '/import',    key: 'importPage',page: 'import',    icon: '⇩' },
-  { to: '/employees', key: 'employees', page: 'employees', icon: '◐' },
-  { to: '/activity-log', key: 'activityLog', page: 'activity_log', icon: '▤' },
-  { to: '/settings',  key: 'settings',  page: 'settings',  icon: '⚙' },
+  { to: '/',          key: 'dashboard', page: 'dashboard', Icon: LayoutDashboard, end: true },
+  { to: '/scan',      key: 'scan',      page: 'scan',      Icon: ScanLine },
+  { to: '/warehouse', key: 'warehouse', page: 'warehouse', Icon: Warehouse },
+  { to: '/arrivals',  key: 'arrivals',  page: 'arrivals',  Icon: PackagePlus },
+  { to: '/library',   key: 'library',   page: 'library',   Icon: Library },
+  { to: '/clients',   key: 'clients',   page: 'clients',   Icon: Users },
+  { to: '/preorders', key: 'preorders', page: 'preorders', Icon: ClipboardList },
+  { to: '/sales',     key: 'sales',     page: 'sales',     Icon: ShoppingCart },
+  { to: '/service',   key: 'service',   page: 'service',   Icon: Wrench },
+  { to: '/finance',   key: 'finance',   page: 'finance',   Icon: Wallet },
+  { to: '/analytics', key: 'analytics', page: 'analytics', Icon: BarChart3 },
+  { to: '/reports',   key: 'reports',   page: 'reports',   Icon: FileText },
+  { to: '/broadcast', key: 'broadcast', page: 'broadcast', Icon: Megaphone },
+  { to: '/import',    key: 'importPage',page: 'import',    Icon: Upload },
+  { to: '/employees', key: 'employees', page: 'employees', Icon: UserCog },
+  { to: '/activity-log', key: 'activityLog', page: 'activity_log', Icon: History },
+  { to: '/settings',  key: 'settings',  page: 'settings',  Icon: Settings },
 ];
 
 export default function Layout() {
@@ -67,7 +72,7 @@ export default function Layout() {
                 }`
               }
             >
-              <span className="text-base w-4 text-center opacity-80">{item.icon}</span>
+              <item.Icon size={17} className="flex-shrink-0 opacity-90" />
               <span>{t(item.key)}</span>
             </NavLink>
           ))}
@@ -76,7 +81,7 @@ export default function Layout() {
               `flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition mt-1.5 border-t border-border pt-3 ${
                 isActive ? 'text-accent2 font-semibold' : 'text-purple hover:text-purple'
               }`}>
-              <span className="text-base w-4 text-center opacity-80">◇</span>
+              <ShieldCheck size={17} className="flex-shrink-0 opacity-90" />
               <span>{t('admin')}</span>
             </NavLink>
           )}

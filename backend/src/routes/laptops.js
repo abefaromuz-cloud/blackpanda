@@ -36,15 +36,15 @@ router.get('/:id', authenticate, requirePermission('warehouse', 'view'), async (
 });
 
 router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
-  const { brand, series, cpu, ram, gpu, storage, color, screen, touch, images, cost_cny, price_sell_cny, low_stock_threshold, is_hot } = req.body;
+  const { brand, series, cpu, ram, gpu, storage, color, screen, touch, images, cost_cny, price_sell_cny, low_stock_threshold, is_hot, mfr_item_code } = req.body;
   if (!brand) return res.status(400).json({ error: 'Укажите бренд' });
   try {
     const imgArr = Array.isArray(images) ? images.filter(Boolean) : [];
     const result = await pool.query(
-      `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,low_stock_threshold,is_hot)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,low_stock_threshold,is_hot,mfr_item_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [brand, series||null, cpu||null, ram||null, gpu||null, storage||null, color||null, screen||null,
-       touch||'no', imgArr[0]||null, imgArr, cost_cny||0, price_sell_cny||0, low_stock_threshold||2, !!is_hot]
+       touch||'no', imgArr[0]||null, imgArr, cost_cny||0, price_sell_cny||0, low_stock_threshold||2, !!is_hot, mfr_item_code||null]
     );
     await logActivity(req.user, 'Добавлена модель', 'laptop', brand + ' ' + (series||''));
     res.status(201).json(result.rows[0]);
@@ -61,11 +61,12 @@ router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (
         screen=COALESCE($8,screen), touch=COALESCE($9,touch),
         images=COALESCE($10,images), image_url=COALESCE($11,image_url),
         cost_cny=COALESCE($12,cost_cny), price_sell_cny=COALESCE($13,price_sell_cny),
-        low_stock_threshold=COALESCE($14,low_stock_threshold), is_hot=COALESCE($15,is_hot)
-       WHERE id=$16 RETURNING *`,
+        low_stock_threshold=COALESCE($14,low_stock_threshold), is_hot=COALESCE($15,is_hot),
+        mfr_item_code=COALESCE($16,mfr_item_code)
+       WHERE id=$17 RETURNING *`,
       [f.brand,f.series,f.cpu,f.ram,f.gpu,f.storage,f.color,f.screen,f.touch,
        imgArr, imgArr ? imgArr[0] : null, f.cost_cny,f.price_sell_cny,f.low_stock_threshold,
-       f.is_hot !== undefined ? !!f.is_hot : null, req.params.id]
+       f.is_hot !== undefined ? !!f.is_hot : null, f.mfr_item_code, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Модель не найдена' });
     res.json(result.rows[0]);
