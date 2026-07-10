@@ -85,7 +85,7 @@ export default function Layout() {
         {/* Иллюстрация — адаптивная, без фиксированной высоты, чтобы не резалась криво на разных экранах */}
         <div className="relative shrink-0 border-t border-border overflow-hidden" style={{ aspectRatio: '280 / 300' }}>
           <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(225,29,46,0.10), transparent 70%)' }} />
-          <img src="/logo.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
+          <img src="/panda-logo-full.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
             style={{ filter: 'drop-shadow(0 0 16px rgba(225,29,46,0.25))' }} />
         </div>
 
