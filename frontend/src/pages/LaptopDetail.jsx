@@ -7,6 +7,8 @@ import { useLang } from '../i18n/LangContext';
 import { printSerialLabel } from '../utils/print';
 import { useStatuses } from '../hooks/useStatuses';
 import { useLibraryText } from '../hooks/useLibraryText';
+import BarcodeScannerModal from '../components/BarcodeScannerModal';
+import { beep } from '../utils/sound';
 
 const SPEC_ICONS = {
   screen: [Ruler, 'bg-accent/15 text-accent2'],
@@ -40,6 +42,7 @@ export default function LaptopDetail() {
   const [serial, setSerial] = useState('');
   const [bulk, setBulk] = useState('');
   const [showBulk, setShowBulk] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [selected, setSelected] = useState([]);
   const [rate, setRate] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -47,7 +50,7 @@ export default function LaptopDetail() {
   const { can } = useAuth();
   const { t } = useLang();
   const { statuses, badgeClass, isInStock, displayLabel } = useStatuses();
-  const { tr } = useLibraryText();
+  const { lib, tr } = useLibraryText();
   const canEdit = can('warehouse', 'edit');
 
   function load() { api.get(`/laptops/${id}`).then(r => { setL(r.data); setActiveImg(0); }); }
@@ -59,6 +62,17 @@ export default function LaptopDetail() {
     if (!serial.trim()) return;
     await api.post('/serials', { laptop_id: id, serial: serial.trim() });
     setSerial(''); load();
+  }
+
+  async function addFromCamera(text) {
+    setShowCamera(false);
+    try {
+      await api.post('/serials', { laptop_id: id, serial: text.trim() });
+      beep(true); load();
+    } catch (e2) {
+      beep(false);
+      alert(e2.response?.data?.error || 'Ошибка добавления серийника');
+    }
   }
 
   function genSerial() {
@@ -159,14 +173,22 @@ export default function LaptopDetail() {
       {editing ? (
         <form onSubmit={saveEdit} className="card mb-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <input className="inp" placeholder="Бренд" value={editForm.brand} onChange={e => setEditForm(f => ({ ...f, brand: e.target.value }))} required />
-            <input className="inp" placeholder="Серия" value={editForm.series} onChange={e => setEditForm(f => ({ ...f, series: e.target.value }))} />
-            <input className="inp" placeholder="CPU" value={editForm.cpu} onChange={e => setEditForm(f => ({ ...f, cpu: e.target.value }))} />
-            <input className="inp" placeholder="RAM" value={editForm.ram} onChange={e => setEditForm(f => ({ ...f, ram: e.target.value }))} />
-            <input className="inp" placeholder="GPU" value={editForm.gpu} onChange={e => setEditForm(f => ({ ...f, gpu: e.target.value }))} />
-            <input className="inp" placeholder="Накопитель" value={editForm.storage} onChange={e => setEditForm(f => ({ ...f, storage: e.target.value }))} />
-            <input className="inp" placeholder="Цвет" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))} />
-            <input className="inp" placeholder="Экран" value={editForm.screen} onChange={e => setEditForm(f => ({ ...f, screen: e.target.value }))} />
+            <input className="inp" placeholder="Бренд" list="edit-brand-list" value={editForm.brand} onChange={e => setEditForm(f => ({ ...f, brand: e.target.value }))} required />
+            <datalist id="edit-brand-list">{(lib?.brands || []).map(b => <option key={b.id} value={b.name} />)}</datalist>
+            <input className="inp" placeholder="Серия" list="edit-series-list" value={editForm.series} onChange={e => setEditForm(f => ({ ...f, series: e.target.value }))} />
+            <datalist id="edit-series-list">{(lib?.brands?.find(b => b.name === editForm.brand)?.series || []).map(s => <option key={s.id} value={s.name} />)}</datalist>
+            <input className="inp" placeholder="CPU" list="edit-cpu-list" value={editForm.cpu} onChange={e => setEditForm(f => ({ ...f, cpu: e.target.value }))} />
+            <datalist id="edit-cpu-list">{(lib?.values?.cpu || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder="RAM" list="edit-ram-list" value={editForm.ram} onChange={e => setEditForm(f => ({ ...f, ram: e.target.value }))} />
+            <datalist id="edit-ram-list">{(lib?.values?.ram || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder="GPU" list="edit-gpu-list" value={editForm.gpu} onChange={e => setEditForm(f => ({ ...f, gpu: e.target.value }))} />
+            <datalist id="edit-gpu-list">{(lib?.values?.gpu || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder="Накопитель" list="edit-storage-list" value={editForm.storage} onChange={e => setEditForm(f => ({ ...f, storage: e.target.value }))} />
+            <datalist id="edit-storage-list">{(lib?.values?.storage || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder="Цвет" list="edit-color-list" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))} />
+            <datalist id="edit-color-list">{(lib?.values?.color || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder="Экран" list="edit-screen-list" value={editForm.screen} onChange={e => setEditForm(f => ({ ...f, screen: e.target.value }))} />
+            <datalist id="edit-screen-list">{(lib?.values?.screen || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
             <select className="inp" value={editForm.touch} onChange={e => setEditForm(f => ({ ...f, touch: e.target.value }))}>
               <option value="no">Сенсор: Нет</option><option value="yes">Сенсор: Да</option>
             </select>
@@ -226,8 +248,8 @@ export default function LaptopDetail() {
       <div className="card">
         <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
           <div className="font-bold text-sm">Серийные номера ({l.serials.length})</div>
-          {selected.length > 0 && canEdit && (
-            <div className="flex gap-2">
+          {canEdit && (
+            <div className={`flex gap-2 transition ${selected.length === 0 ? 'opacity-40 pointer-events-none' : ''}`}>
               <button className="btn btn-primary btn-sm" onClick={sellSelected}>🛒 Продать выбранные ({selected.length})</button>
               <button className="btn btn-secondary btn-sm" onClick={reserveSelected}>🔒 Зарезервировать</button>
             </div>
@@ -280,10 +302,11 @@ export default function LaptopDetail() {
           <>
             <form onSubmit={addOne} className="flex gap-2 mb-2">
               <input className="inp" placeholder="Новый серийник" value={serial} onChange={e => setSerial(e.target.value)} />
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCamera(true)} title="Сканировать камерой">📷</button>
               <button type="button" className="btn btn-secondary" onClick={genSerial}>BP</button>
               <button className="btn btn-primary px-4">+</button>
             </form>
-            <button className="text-accent2 text-xs hover:underline" onClick={() => setShowBulk(s => !s)}>🏷️ Массовая загрузка серийников</button>
+            <button className="btn btn-secondary btn-sm w-full justify-center" onClick={() => setShowBulk(s => !s)}>🏷️ Массовая загрузка серийников {showBulk ? '▲' : '▼'}</button>
             {showBulk && (
               <form onSubmit={addBulk} className="mt-2">
                 <textarea className="inp mb-2" rows={3} placeholder="По одному серийнику в строке" value={bulk} onChange={e => setBulk(e.target.value)} />
@@ -292,6 +315,9 @@ export default function LaptopDetail() {
             )}
           </>
         )}
+      </div>
+
+      {showCamera && <BarcodeScannerModal onResult={addFromCamera} onClose={() => setShowCamera(false)} />}
       </div>
     </div>
   );
