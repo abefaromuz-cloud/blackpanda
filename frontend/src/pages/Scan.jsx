@@ -48,6 +48,15 @@ export default function Scan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Предзаполнение клиента из его карточки (кнопка "Новая продажа")
+  useEffect(() => {
+    const cid = sessionStorage.getItem('bp_scan_client');
+    if (cid) {
+      sessionStorage.removeItem('bp_scan_client');
+      setClientId(cid);
+    }
+  }, []);
+
   async function addSerial(sn) {
     const s = sn.trim();
     if (!s || scanned.some(x => x.serial === s)) { setScanInput(''); return; }
@@ -207,7 +216,7 @@ export default function Scan() {
         {step === 3 && (
           <div>
             {client && <div className="mb-3 p-2 rounded-lg bg-bg3 text-sm">👤 <b>{client.name}</b></div>}
-            <table className="w-full text-sm mb-3">
+            <div className="overflow-x-auto"><table className="w-full text-sm mb-3">
               <thead><tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
                 <th className="pb-2">{t('model')}</th><th className="pb-2">{t('qty')}</th><th className="pb-2">{t('sellPrice')} ¥</th><th className="pb-2">{t('total')}</th>
               </tr></thead>
@@ -221,11 +230,18 @@ export default function Scan() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-            <div className="flex items-center gap-2 mb-3">
+            </table></div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <label className="text-xs text-text2">{t('discount')}</label>
               <input className="inp w-32" type="number" value={discountRub} onChange={e => setDiscountRub(e.target.value)} />
+              {client?.discount_percent > 0 && (
+                <button type="button" className="text-xs text-accent2 hover:underline"
+                  onClick={() => setDiscountRub(Math.round(subtotalRub * Number(client.discount_percent) / 100))}>
+                  У клиента скидка {client.discount_percent}% — применить ({Math.round(subtotalRub * Number(client.discount_percent) / 100).toLocaleString('ru-RU')} ₽)
+                </button>
+              )}
             </div>
+            <div className="mb-3" />
             <div className="bg-bg3 rounded-xl p-4 mb-4">
               <div className="flex justify-between text-sm mb-1"><span className="text-text3">{t('subtotal')} ₽</span><span className="font-mono">{Math.round(subtotalRub).toLocaleString('ru-RU')} ₽</span></div>
               {Number(discountRub) > 0 && <div className="flex justify-between text-sm mb-1"><span className="text-text3">{t('discount')}</span><span className="font-mono text-red">−{Number(discountRub).toLocaleString('ru-RU')} ₽</span></div>}

@@ -12,7 +12,7 @@ export default function ActivityLog() {
     <div>
       <h1 className="text-2xl font-black mb-6">{t('activityLog')}</h1>
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
               <th className="pb-2">{t('date')}</th><th className="pb-2">{t('who')}</th><th className="pb-2">{t('action')}</th><th className="pb-2">{t('entity')}</th>
@@ -28,7 +28,7 @@ export default function ActivityLog() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {log.length === 0 && <div className="text-text3 text-sm">—</div>}
       </div>
     </div>

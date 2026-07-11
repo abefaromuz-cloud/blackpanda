@@ -25,6 +25,16 @@ export default function Service() {
   }
   useEffect(load, []);
 
+  // Предзаполнение клиента из его карточки (кнопка "Сдать в сервис")
+  useEffect(() => {
+    const cid = sessionStorage.getItem('bp_service_client');
+    if (cid) {
+      sessionStorage.removeItem('bp_service_client');
+      setForm(f => ({ ...f, client_id: cid }));
+      setShowForm(true);
+    }
+  }, []);
+
   async function checkSerial() {
     setSerialErr(''); setFoundSerial(null);
     try {
@@ -107,7 +117,7 @@ export default function Service() {
       )}
 
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
               <th className="pb-2">{t('date')}</th><th className="pb-2">Устройство</th><th className="pb-2">{t('client')}</th>
@@ -144,7 +154,7 @@ export default function Service() {
             })}
             {!orders.length && <tr><td colSpan={7} className="text-center py-6 text-text3">Нет заявок</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

@@ -282,6 +282,17 @@ CREATE TABLE IF NOT EXISTS lib_values (
 ALTER TABLE lib_values ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 100;
 ALTER TABLE lib_values ADD COLUMN IF NOT EXISTS value_zh TEXT;
 
+-- Личные задачи/напоминания на дашборде (в т.ч. можно привязать к клиенту — напомнить о долге)
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  due_date DATE,
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  done BOOLEAN NOT NULL DEFAULT false,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Порядок разделов в боковом меню (общий для всех, настраивается администратором)
 CREATE TABLE IF NOT EXISTS nav_order (
   page_key TEXT PRIMARY KEY,
@@ -348,8 +359,25 @@ DROP TABLE IF EXISTS suppliers CASCADE;
 DELETE FROM role_permissions WHERE page_key='suppliers';
 DELETE FROM user_permissions WHERE page_key='suppliers';
 
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'retail'; -- retail | wholesale | vip
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS manager_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+-- Заметки/звонки/ручные записи взаимодействия с клиентом (комментарии менеджера, звонки, отметки Telegram)
+CREATE TABLE IF NOT EXISTS client_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'comment', -- comment | call | telegram
+  text TEXT NOT NULL,
+  created_by UUID REFERENCES users(id),
+  created_by_name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS cost_cny NUMERIC(12,2);
 ALTER TABLE serials ADD COLUMN IF NOT EXISTS arrival_note TEXT;
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS price_override_cny NUMERIC(12,2);
 
 -- Сервис/ремонт: и наши ноутбуки (свой серийник), и внешние (клиент принёс своё устройство)
 CREATE TABLE IF NOT EXISTS service_orders (
@@ -438,3 +466,7 @@ CREATE TABLE IF NOT EXISTS cbr_rate_history (
 );
 
 INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Стартовые скидки по категории клиента (справочные значения, админ может менять руками у каждого клиента)
+UPDATE clients SET discount_percent = 5 WHERE category = 'vip' AND discount_percent = 0;
+UPDATE clients SET discount_percent = 3 WHERE category = 'wholesale' AND discount_percent = 0;

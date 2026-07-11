@@ -277,7 +277,7 @@ export default function Warehouse() {
           ))}
         </div>
       )}
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-4">
         {[['brand', 'Бренд'], ['series', 'Серия'], ['cpu', 'CPU'], ['ram', 'RAM'], ['gpu', 'GPU'], ['storage', 'Накопитель'], ['color', 'Цвет'], ['screen', 'Экран']].map(([k, label]) => (
           <select key={k} className="inp text-xs" value={filters[k]} onChange={e => setFilters(f => ({ ...f, [k]: e.target.value }))}>
             <option value="">{label}</option>

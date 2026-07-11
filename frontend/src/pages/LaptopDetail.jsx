@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Ruler, Cpu, MemoryStick, HardDrive, Gamepad2, Palette, Hand, Package, DollarSign } from 'lucide-react';
+import { Ruler, Cpu, MemoryStick, HardDrive, Gamepad2, Palette, Hand, Package, DollarSign, Tag, Eye, EyeOff } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
@@ -19,6 +19,7 @@ const SPEC_ICONS = {
   color: [Palette, 'bg-yellow/15 text-yellow'],
   touch: [Hand, 'bg-yellow/15 text-yellow'],
   stock: [Package, 'bg-yellow/15 text-yellow'],
+  price: [Tag, 'bg-green/15 text-green'],
   cost: [DollarSign, 'bg-accent/15 text-accent2'],
 };
 
@@ -43,6 +44,7 @@ export default function LaptopDetail() {
   const [bulk, setBulk] = useState('');
   const [showBulk, setShowBulk] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showCost, setShowCost] = useState(false);
   const [selected, setSelected] = useState([]);
   const [rate, setRate] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -240,7 +242,23 @@ export default function LaptopDetail() {
             <SpecBox Icon={SPEC_ICONS.color[0]} iconClass={SPEC_ICONS.color[1]} label="Цвет" value={tr('color', l.color)} />
             <SpecBox Icon={SPEC_ICONS.touch[0]} iconClass={SPEC_ICONS.touch[1]} label="Сенсор" value={l.touch === 'yes' ? 'Да' : 'Нет'} />
             <SpecBox Icon={SPEC_ICONS.stock[0]} iconClass={SPEC_ICONS.stock[1]} label="На складе" value={`${inStockCount} / ${l.serials.length}`} />
-            <SpecBox Icon={SPEC_ICONS.cost[0]} iconClass={SPEC_ICONS.cost[1]} label="Себестоимость" value={`¥${l.cost_cny}`} />
+            <SpecBox Icon={SPEC_ICONS.price[0]} iconClass={SPEC_ICONS.price[1]} label="Цена продажи" value={`¥${l.price_sell_cny} ≈ ${Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽`} />
+            {(() => {
+              const CostIcon = showCost ? SPEC_ICONS.cost[0] : EyeOff;
+              return (
+                <button onClick={() => setShowCost(s => !s)} className="card flex items-center gap-3 py-3 text-left w-full">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${SPEC_ICONS.cost[1]}`}>
+                    <CostIcon size={17} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] text-text3 uppercase font-bold tracking-wide flex items-center gap-1">
+                      Себестоимость {showCost ? <EyeOff size={11} /> : <Eye size={11} />}
+                    </div>
+                    <div className="font-bold text-sm truncate">{showCost ? `¥${l.cost_cny}` : '••••'}</div>
+                  </div>
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}

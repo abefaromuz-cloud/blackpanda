@@ -39,7 +39,7 @@ export default function Cash() {
       </div>
 
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
               <th className="pb-2">{t('date')}</th><th className="pb-2">{t('type')}</th><th className="pb-2">{t('amount')}</th><th className="pb-2">{t('comment')}</th>
@@ -61,7 +61,7 @@ export default function Cash() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

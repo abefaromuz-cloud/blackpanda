@@ -47,7 +47,7 @@ export default function Employees() {
       )}
 
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
               <th className="pb-2">{t('fullName')}</th><th className="pb-2">{t('position')}</th><th className="pb-2">{t('phone')}</th>
@@ -66,7 +66,7 @@ export default function Employees() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

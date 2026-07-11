@@ -117,6 +117,16 @@ router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Своя цена продажи для конкретной единицы (например, "Склад (восст.)" со скидкой) —
+// отдельный эндпоинт, чтобы явно различать "не менять" и "сбросить обратно на цену модели"
+router.put('/:id/price-override', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
+  const { price_override_cny } = req.body; // null или '' — сброс на цену модели
+  const value = (price_override_cny === '' || price_override_cny === null || price_override_cny === undefined) ? null : price_override_cny;
+  const result = await pool.query('UPDATE serials SET price_override_cny=$1 WHERE id=$2 RETURNING *', [value, req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Не найден' });
+  res.json(result.rows[0]);
+});
+
 // Оформить возврат: фиксируется от какого клиента и по какой причине, новый статус выбирает сотрудник
 // (например "Склад (восст.)", "Гарантия КНР", "На ремонте" — а не всегда просто обратно "На складе")
 router.post('/:id/return', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {

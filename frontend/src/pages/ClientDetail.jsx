@@ -1,24 +1,34 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Phone, Send, Wallet, ShoppingCart, Wrench, ClipboardList, History as HistoryIcon } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 
+const CATEGORY_LABEL = { retail: 'Розница', wholesale: 'Опт', vip: 'VIP' };
+const CATEGORY_BADGE = { retail: 'badge-blue', wholesale: 'badge-purple', vip: 'badge-yellow' };
+
 export default function ClientDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [c, setC] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [managers, setManagers] = useState([]);
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('clients', 'edit');
 
   function load() { api.get(`/clients/${id}`).then(r => setC(r.data)); }
   useEffect(load, [id]);
+  useEffect(() => { api.get('/clients/managers-list').then(r => setManagers(r.data)); }, []);
   if (!c) return <div className="text-text3">{t('loading')}</div>;
 
   const openDebts = c.debts.filter(d => d.status === 'open');
   const totalDebt = openDebts.reduce((s, d) => s + (Number(d.amount_rub) - Number(d.amount_paid_rub)), 0);
+  const daysAgo = c.last_purchase_at ? Math.floor((Date.now() - new Date(c.last_purchase_at)) / 86400000) : null;
 
   async function adjustBalance() {
     if (!adjustAmount) return;
@@ -43,11 +53,86 @@ export default function ClientDetail() {
     alert(r.data.ok ? 'Отправлено ✅' : 'Ошибка: ' + (r.data.error || '—'));
   }
 
+  function startEdit() {
+    setEditForm({
+      name: c.name, phone: c.phone || '', telegram: c.telegram || '', city: c.city || '',
+      category: c.category, discount_percent: c.discount_percent, manager_id: c.manager_id || '', avatar_url: c.avatar_url || '',
+    });
+    setEditing(true);
+  }
+  async function saveEdit(e) {
+    e.preventDefault();
+    await api.put(`/clients/${id}`, editForm);
+    setEditing(false); load();
+  }
+
+  function newSale() {
+    sessionStorage.setItem('bp_scan_client', id);
+    navigate('/scan');
+  }
+  function newService() {
+    sessionStorage.setItem('bp_service_client', id);
+    navigate('/service');
+  }
+
   return (
     <div>
       <Link to="/clients" className="text-text3 text-sm hover:text-text2">← {t('clients')}</Link>
-      <h1 className="text-xl font-black mt-2 mb-1">{c.name}</h1>
-      <div className="text-text3 text-sm mb-5">{c.phone} {c.telegram && `· ${c.telegram}`}</div>
+
+      <div className="card mt-2 mb-4">
+        <div className="flex justify-between items-start flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-bg3 border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
+              {c.avatar_url ? <img src={c.avatar_url} className="w-full h-full object-cover" alt="" /> : <span className="text-xl font-bold text-text3">{c.name?.[0]}</span>}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black">{c.name}</h1>
+                <span className={`badge ${CATEGORY_BADGE[c.category] || 'badge-blue'}`}>{CATEGORY_LABEL[c.category] || c.category}</span>
+              </div>
+              <div className="text-text3 text-sm mt-1">
+                {c.telegram && <span>✈️ {c.telegram} </span>}
+                {c.phone && <span>· {c.phone} </span>}
+                {c.city && <span>· 📍 {c.city}</span>}
+              </div>
+              <div className="text-xs text-text3 mt-1">{daysAgo === null ? 'Покупок ещё не было' : daysAgo === 0 ? 'Последняя покупка сегодня' : `Последняя покупка ${daysAgo} дн. назад`}</div>
+            </div>
+          </div>
+          {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
+        </div>
+
+        {editing && (
+          <form onSubmit={saveEdit} className="mt-4 pt-4 border-t border-border grid grid-cols-2 md:grid-cols-4 gap-3">
+            <input className="inp" placeholder={t('name')} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            <input className="inp" placeholder={t('phone')} value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+            <input className="inp" placeholder="Telegram" value={editForm.telegram} onChange={e => setEditForm(f => ({ ...f, telegram: e.target.value }))} />
+            <input className="inp" placeholder="Город" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+            <select className="inp" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
+              <option value="retail">Розница</option><option value="wholesale">Опт</option><option value="vip">VIP</option>
+            </select>
+            <input className="inp" type="number" placeholder="Скидка %" value={editForm.discount_percent} onChange={e => setEditForm(f => ({ ...f, discount_percent: e.target.value }))} />
+            <select className="inp" value={editForm.manager_id} onChange={e => setEditForm(f => ({ ...f, manager_id: e.target.value }))}>
+              <option value="">— Менеджер —</option>
+              {managers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+            </select>
+            <input className="inp" placeholder="Ссылка на фото (аватар)" value={editForm.avatar_url} onChange={e => setEditForm(f => ({ ...f, avatar_url: e.target.value }))} />
+            <div className="col-span-2 md:col-span-4 flex gap-2">
+              <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>{t('cancel')}</button>
+              <button className="btn btn-primary">{t('save')}</button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {canEdit && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          {c.telegram && <a href={`https://t.me/${c.telegram.replace('@', '')}`} target="_blank" rel="noreferrer" className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Send size={15} /><span className="text-xs font-bold">Telegram</span></a>}
+          {c.phone && <a href={`tel:${c.phone}`} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Phone size={15} /><span className="text-xs font-bold">Позвонить</span></a>}
+          <button onClick={newSale} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><ShoppingCart size={15} /><span className="text-xs font-bold">Новая продажа</span></button>
+          <button onClick={newService} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Wrench size={15} /><span className="text-xs font-bold">Сдать в сервис</span></button>
+          <button onClick={() => alert('Генерация PDF-договора скоро будет доступна 🐼')} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50 opacity-70"><ClipboardList size={15} /><span className="text-xs font-bold">PDF Договор</span></button>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card">
@@ -100,9 +185,9 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card">
-          <div className="font-bold text-sm mb-3">{t('preorders')}</div>
+          <div className="font-bold text-sm mb-3 flex items-center gap-1.5"><ClipboardList size={15} /> {t('preorders')}</div>
           {c.preorders.length === 0 && <div className="text-text3 text-sm">—</div>}
           {c.preorders.map(p => (
             <Link key={p.id} to={`/preorders/${p.id}`} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
@@ -114,7 +199,7 @@ export default function ClientDetail() {
         <div className="card">
           <div className="font-bold text-sm mb-3">{t('sales')}</div>
           {c.sales.length === 0 && <div className="text-text3 text-sm">—</div>}
-          {c.sales.map(s => (
+          {c.sales.slice(0, 5).map(s => (
             <div key={s.id} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
               <span className="text-text3">{new Date(s.created_at).toLocaleDateString('ru-RU')}</span>
               <span className="font-mono">{Math.round(s.total_rub).toLocaleString('ru-RU')} ₽</span>
@@ -122,6 +207,10 @@ export default function ClientDetail() {
           ))}
         </div>
       </div>
+
+      <Link to={`/clients/${id}/history`} className="card flex items-center justify-center gap-2 py-3 hover:border-accent/50 text-accent2 font-semibold text-sm">
+        <HistoryIcon size={16} /> Смотреть всю историю →
+      </Link>
     </div>
   );
 }

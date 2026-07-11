@@ -12,7 +12,7 @@ export default function Sales() {
     <div>
       <h1 className="text-2xl font-black mb-6">{t('sales')}</h1>
       <div className="card">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
               <th className="pb-2">{t('date')}</th><th className="pb-2">{t('client')}</th><th className="pb-2">{t('qty')}</th><th className="pb-2">¥</th><th className="pb-2">₽</th><th className="pb-2"></th>
@@ -35,7 +35,7 @@ export default function Sales() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   );

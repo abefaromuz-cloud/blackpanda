@@ -1,14 +1,15 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, ScanLine, Warehouse, PackagePlus, Library, Users,
   ClipboardList, ShoppingCart, Wrench, Wallet, BarChart3, FileText,
-  Megaphone, Upload, UserCog, History, Settings, ShieldCheck,
+  Megaphone, Upload, UserCog, History, Settings, ShieldCheck, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels } from '../i18n/translations';
 import api from '../api/client';
+import Header from './Header';
 
 const navItems = [
   { to: '/',          key: 'dashboard', page: 'dashboard', Icon: LayoutDashboard, end: true },
@@ -32,11 +33,15 @@ const navItems = [
 
 export default function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, can, logout } = useAuth();
   const { t, lang, setLang } = useLang();
   const [order, setOrder] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => { api.get('/nav-order').then(r => setOrder(r.data.map(o => o.page_key))); }, []);
+  // Закрываем мобильное меню при каждой смене страницы
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const orderedItems = order
     ? [...navItems].sort((a, b) => {
@@ -52,13 +57,34 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-bg">
-      <aside className="w-72 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0">
+      {/* Мобильная верхняя панель — видна только на маленьких экранах */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-bg2 border-b border-border flex items-center gap-3 px-4 py-3">
+        <button onClick={() => setMobileOpen(true)} className="text-text2 hover:text-text">
+          <Menu size={22} />
+        </button>
+        <img src="/logo.png" alt="" className="h-8 w-auto object-contain" />
+        <span className="font-black text-sm">BlackPanda</span>
+      </div>
+
+      {/* Затемнение фона при открытом мобильном меню */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setMobileOpen(false)} />
+      )}
+
+      <aside className={`
+        w-72 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0
+        fixed md:static inset-y-0 left-0 z-50 transition-transform duration-200
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+      `}>
         <div className="p-4 border-b border-border flex items-center gap-2.5">
           <img src="/logo.png" alt="" className="h-14 w-auto object-contain flex-shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-xl font-black leading-none tracking-tight truncate">BlackPanda</h1>
             <p className="text-[10px] text-accent2 mt-1 font-semibold tracking-widest uppercase">CRM</p>
           </div>
+          <button onClick={() => setMobileOpen(false)} className="md:hidden text-text3 hover:text-text flex-shrink-0">
+            <X size={20} />
+          </button>
         </div>
         <nav className="flex-1 p-2.5 space-y-0.5 overflow-y-auto min-h-0">
           {visibleItems.map(item => (
@@ -87,8 +113,9 @@ export default function Layout() {
           )}
         </nav>
 
-        {/* Иллюстрация — адаптивная, без фиксированной высоты, чтобы не резалась криво на разных экранах */}
-        <div className="relative shrink-0 border-t border-border overflow-hidden" style={{ aspectRatio: '280 / 320' }}>
+        {/* Иллюстрация — адаптивная, без фиксированной высоты, чтобы не резалась криво на разных экранах.
+            На мобильном (короткие экраны) скрываем, чтобы не съедала место у самого меню. */}
+        <div className="hidden sm:block relative shrink-0 border-t border-border overflow-hidden" style={{ aspectRatio: '280 / 320' }}>
           <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(225,29,46,0.10), transparent 70%)' }} />
           <img src="/panda-logo-full.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[85%] h-auto object-contain"
             style={{ filter: 'drop-shadow(0 0 16px rgba(225,29,46,0.25))' }} />
@@ -108,8 +135,11 @@ export default function Layout() {
           </div>
         </div>
       </aside>
-      <main className="flex-1 p-6 overflow-y-auto min-w-0">
-        <Outlet />
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <Header />
+        <div className="flex-1 p-4 md:p-6 pt-20 md:pt-6 overflow-y-auto">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

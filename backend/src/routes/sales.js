@@ -47,9 +47,18 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
         if (!sr.rows[0]) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
         sers.push(sr.rows[0]);
       }
-      const unitPriceCny = it.price_sell_cny !== undefined ? Number(it.price_sell_cny) : Number(laptop.price_sell_cny);
+      const manualOverride = it.price_sell_cny !== undefined && it.price_sell_cny !== '';
       const qty = sers.length;
-      const totalCny = unitPriceCny * qty;
+      let totalCny;
+      if (manualOverride) {
+        // Сотрудник вручную поправил цену в визарде — применяем её ко всей группе как обычно
+        totalCny = Number(it.price_sell_cny) * qty;
+      } else {
+        // Иначе — берём цену каждой единицы отдельно: своя цена серийника (например, скидка на
+        // восстановленный), если задана, иначе цена модели по умолчанию
+        totalCny = sers.reduce((sum, sr) => sum + Number(sr.price_override_cny ?? laptop.price_sell_cny), 0);
+      }
+      const unitPriceCny = qty > 0 ? totalCny / qty : Number(laptop.price_sell_cny);
       const totalRub = totalCny * rate;
       subtotalCny += totalCny; subtotalRub += totalRub;
       resolvedItems.push({ laptop, sers, unitPriceCny, qty, totalCny, totalRub, costCny: Number(laptop.cost_cny) });

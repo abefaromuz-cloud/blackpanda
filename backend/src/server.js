@@ -32,6 +32,8 @@ app.use('/api/broadcast', require('./routes/broadcast'));
 app.use('/api/library', require('./routes/library'));
 app.use('/api/arrivals', require('./routes/arrivals'));
 app.use('/api/service', require('./routes/service'));
+app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/search', require('./routes/search'));
 app.use('/api/nav-order', require('./routes/navOrder'));
 
 // Раздача собранного фронтенда

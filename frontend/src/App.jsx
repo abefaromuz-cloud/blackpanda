@@ -1,13 +1,12 @@
-import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import VideoIntro from './components/VideoIntro';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Warehouse from './pages/Warehouse';
 import LaptopDetail from './pages/LaptopDetail';
 import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
+import ClientHistory from './pages/ClientHistory';
 import Preorders from './pages/Preorders';
 import PreorderDetail from './pages/PreorderDetail';
 import Sales from './pages/Sales';
@@ -59,10 +58,6 @@ function ClientGuard({ children }) {
 }
 
 export default function App() {
-  const [showIntro, setShowIntro] = useState(true);
-
-  if (showIntro) return <VideoIntro onDone={() => setShowIntro(false)} />;
-
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -74,6 +69,7 @@ export default function App() {
         <Route path="serials/:id" element={<PermGuard page="warehouse"><SerialDetail /></PermGuard>} />
         <Route path="clients" element={<PermGuard page="clients"><Clients /></PermGuard>} />
         <Route path="clients/:id" element={<PermGuard page="clients"><ClientDetail /></PermGuard>} />
+        <Route path="clients/:id/history" element={<PermGuard page="clients"><ClientHistory /></PermGuard>} />
         <Route path="preorders" element={<PermGuard page="preorders"><Preorders /></PermGuard>} />
         <Route path="preorders/:id" element={<PermGuard page="preorders"><PreorderDetail /></PermGuard>} />
         <Route path="sales" element={<PermGuard page="sales"><Sales /></PermGuard>} />

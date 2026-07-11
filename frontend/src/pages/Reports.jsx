@@ -47,7 +47,7 @@ export default function Reports() {
           <button className="btn btn-secondary" onClick={exportCsv}>⇩ {t('exportCsv')}</button>
         </div>
         {salesReport && (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
                 <th className="pb-2">{t('date')}</th><th className="pb-2">{t('client')}</th><th className="pb-2">¥</th><th className="pb-2">₽</th>
@@ -67,7 +67,7 @@ export default function Reports() {
                 <td className="py-2 font-mono font-bold">{Math.round(salesReport.totals.total_rub).toLocaleString('ru-RU')} ₽</td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
@@ -77,7 +77,7 @@ export default function Reports() {
           <button className="btn btn-secondary" onClick={genWarehouse}>{t('generate')}</button>
         </div>
         {whReport && (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
                 <th className="pb-2">{t('model')}</th><th className="pb-2">{t('inStock')}</th><th className="pb-2">{t('costPrice')}</th><th className="pb-2">{t('sellPrice')}</th>
@@ -93,7 +93,7 @@ export default function Reports() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
     </div>

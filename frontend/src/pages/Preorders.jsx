@@ -50,7 +50,7 @@ export default function Preorders() {
             </select>
           </div>
           {items.map((it, i) => (
-            <div key={i} className="grid grid-cols-4 gap-2 mb-2">
+            <div key={i} className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
               <select className="inp" value={it.laptop_id} onChange={e => updateItem(i, { laptop_id: e.target.value })} required>
                 <option value="">{t('model')}</option>
                 {laptops.map(l => <option key={l.id} value={l.id}>{l.brand} {l.series}</option>)}
