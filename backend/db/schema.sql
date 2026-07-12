@@ -471,23 +471,9 @@ INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 UPDATE clients SET discount_percent = 5 WHERE category = 'vip' AND discount_percent = 0;
 UPDATE clients SET discount_percent = 3 WHERE category = 'wholesale' AND discount_percent = 0;
 
--- Дополнительные позиции в одной заявке сервиса (когда клиент сдаёт сразу несколько устройств
--- за один визит). Первая позиция хранится прямо в service_orders (как было), а сюда добавляются
--- ВТОРАЯ и последующие — так не ломаем уже существующие заявки и код.
-CREATE TABLE IF NOT EXISTS service_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL DEFAULT 'external',
-  serial_id UUID REFERENCES serials(id) ON DELETE SET NULL,
-  device_label TEXT,
-  issue TEXT,
-  is_warranty BOOLEAN NOT NULL DEFAULT false,
-  cost_rub NUMERIC(12,2) DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 -- Сервис: переход на мультипозиционные заявки — одна заявка (клиент, дата, статус) может
 -- содержать несколько устройств/позиций (как было в старой версии — svcAddItem).
+DROP TABLE IF EXISTS service_items; -- забытый черновик более раннего варианта, больше не используется
 CREATE TABLE IF NOT EXISTS service_order_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   service_order_id UUID NOT NULL,
@@ -521,6 +507,8 @@ BEGIN
         WHERE NOT EXISTS (SELECT 1 FROM service_order_items soi WHERE soi.service_order_id = so.id)
     ';
   END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Перенос позиций сервиса пропущен (уже перенесено ранее или колонки отсутствуют): %', SQLERRM;
 END $$;
 
 ALTER TABLE service_orders DROP COLUMN IF EXISTS kind;
