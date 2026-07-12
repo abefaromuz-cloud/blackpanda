@@ -502,6 +502,7 @@ CREATE TABLE IF NOT EXISTS service_order_items (
   return_status TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE service_order_items DROP CONSTRAINT IF EXISTS service_order_items_order_fk;
 ALTER TABLE service_order_items ADD CONSTRAINT service_order_items_order_fk
   FOREIGN KEY (service_order_id) REFERENCES service_orders(id) ON DELETE CASCADE;
 
