@@ -508,11 +508,20 @@ ALTER TABLE service_order_items ADD CONSTRAINT service_order_items_order_fk
 
 -- Разовая идемпотентная миграция: переносим уже существующие одно-позиционные заявки в
 -- новую таблицу позиций (если ещё не перенесены), затем убираем позиционные поля из заявки.
-INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at)
-  SELECT id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at
-  FROM service_orders so
-  WHERE NOT EXISTS (SELECT 1 FROM service_order_items soi WHERE soi.service_order_id = so.id)
-    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_orders' AND column_name='kind');
+-- Обёрнуто в DO-блок с динамическим SQL: без этого Postgres пытается резолвить колонки
+-- service_orders.kind и т.д. ещё на этапе разбора запроса, даже если WHERE EXISTS их
+-- отфильтрует — и падает при повторном запуске миграции, когда колонки уже перенесены.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_orders' AND column_name='kind') THEN
+    EXECUTE '
+      INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at)
+        SELECT id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at
+        FROM service_orders so
+        WHERE NOT EXISTS (SELECT 1 FROM service_order_items soi WHERE soi.service_order_id = so.id)
+    ';
+  END IF;
+END $$;
 
 ALTER TABLE service_orders DROP COLUMN IF EXISTS kind;
 ALTER TABLE service_orders DROP COLUMN IF EXISTS serial_id;
