@@ -4,7 +4,9 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useStatuses } from '../hooks/useStatuses';
+import PriceSparkline from '../components/PriceSparkline';
 import { useLibraryText } from '../hooks/useLibraryText';
+import { useTT } from '../i18n/useTT';
 
 const emptyForm = {
   brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: 'no',
@@ -20,6 +22,8 @@ export default function Warehouse() {
   const [lib, setLib] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
   const [search, setSearch] = useState('');
   const [serialMatches, setSerialMatches] = useState([]);
   const [filters, setFilters] = useState({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' });
@@ -27,6 +31,7 @@ export default function Warehouse() {
   const { can } = useAuth();
   const { badgeClass } = useStatuses();
   const { tr } = useLibraryText();
+  const tt = useTT();
   const { t } = useLang();
   const canEdit = can('warehouse', 'edit');
 
@@ -47,6 +52,33 @@ export default function Warehouse() {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  async function handlePhotoRecognize(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAiLoading(true); setAiError('');
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { data } = await api.post('/ai/extract-specs', { image_base64: base64, media_type: file.type });
+      setForm(f => ({
+        ...f,
+        brand: data.brand || f.brand, series: data.series || f.series, cpu: data.cpu || f.cpu,
+        ram: data.ram || f.ram, storage: data.storage || f.storage, gpu: data.gpu || f.gpu,
+        color: data.color || f.color, screen: data.screen || f.screen,
+        mfr_item_code: data.item_code || f.mfr_item_code,
+      }));
+    } catch (err) {
+      setAiError(err.response?.data?.error || 'Не удалось распознать фото');
+    } finally {
+      setAiLoading(false);
+      e.target.value = '';
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -70,7 +102,7 @@ export default function Warehouse() {
   }
 
   async function remove(id) {
-    if (!confirm('Удалить модель?')) return;
+    if (!confirm(tt('Удалить модель?'))) return;
     await api.delete(`/laptops/${id}`);
     load();
   }
@@ -176,11 +208,11 @@ export default function Warehouse() {
     const rows = filtered.map(l => `<tr>
       <td>${l.brand}</td><td>${l.series || ''}</td><td>${l.cpu || ''}</td><td>${l.ram || ''}</td>
       <td>${l.storage || ''}</td><td>${l.gpu || ''}</td><td>${l.color || ''}</td>
-      <td>${l.touch === 'yes' ? 'Да' : 'Нет'}</td><td>${l.in_stock}</td>
+      <td>${l.touch === 'yes' ? tt('Да') : tt('Нет')}</td><td>${l.in_stock}</td>
       <td>¥${l.price_sell_cny}</td><td>${Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
     </tr>`).join('');
     const html = `<html><head><meta charset="UTF-8"></head><body><table border="1">
-      <tr><th>Бренд</th><th>Серия</th><th>CPU</th><th>RAM</th><th>Накопитель</th><th>GPU</th><th>Цвет</th><th>Сенсор</th><th>Кол-во</th><th>Цена ¥</th><th>Цена ₽</th></tr>
+      <tr><th>${tt("Бренд")}</th><th>${tt("Серия")}</th><th>CPU</th><th>RAM</th><th>${tt("Накопитель")}</th><th>GPU</th><th>${tt("Цвет")}</th><th>${tt("Сенсор")}</th><th>${tt("Кол-во")}</th><th>${tt("Цена")} ¥</th><th>${tt("Цена")} ₽</th></tr>
       ${rows}</table></body></html>`;
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const a = document.createElement('a');
@@ -208,7 +240,7 @@ export default function Warehouse() {
             <div key={r.id} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0">
               <span>{r.brand} {r.series} · <span className="font-mono text-text3">{r.serial}</span> {r.client_name && `· ${r.client_name}`}</span>
               <span className="flex items-center gap-2">
-                {r.deadline && <span className="text-xs text-text3">до {new Date(r.deadline).toLocaleDateString('ru-RU')}</span>}
+                {r.deadline && <span className="text-xs text-text3">{tt('до')} {new Date(r.deadline).toLocaleDateString('ru-RU')}</span>}
                 {canEdit && <button className="text-red text-xs hover:underline" onClick={() => releaseReservation(r.id)}>{t('releaseReservation')}</button>}
               </span>
             </div>
@@ -218,10 +250,18 @@ export default function Warehouse() {
 
       {showForm && canEdit && (
         <form onSubmit={submit} className="card mb-5">
+          <div className="bg-bg3 rounded-xl p-3 mb-3 flex items-center gap-3 flex-wrap">
+            <label className="btn btn-secondary btn-sm cursor-pointer">
+              📷 {tt('Распознать по фото коробки')}
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoRecognize} />
+            </label>
+            {aiLoading && <span className="text-xs text-text3">{tt('Распознаю...')}</span>}
+            {aiError && <span className="text-xs text-red">{aiError}</span>}
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <input className="inp" placeholder="Бренд" list="brand-list" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} required />
+            <input className="inp" placeholder={tt("Бренд")} list="brand-list" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} required />
             <datalist id="brand-list">{opts.brand.map(b => <option key={b} value={b} />)}</datalist>
-            <input className="inp" placeholder="Серия" list="series-list" value={form.series} onChange={e => setForm(f => ({ ...f, series: e.target.value }))} />
+            <input className="inp" placeholder={tt("Серия")} list="series-list" value={form.series} onChange={e => setForm(f => ({ ...f, series: e.target.value }))} />
             <datalist id="series-list">{seriesOpts.map(v => <option key={v} value={v} />)}</datalist>
             <input className="inp" placeholder="CPU" list="cpu-list" value={form.cpu} onChange={e => setForm(f => ({ ...f, cpu: e.target.value }))} />
             <datalist id="cpu-list">{opts.cpu.map(v => <option key={v} value={v} />)}</datalist>
@@ -229,45 +269,45 @@ export default function Warehouse() {
             <datalist id="ram-list">{opts.ram.map(v => <option key={v} value={v} />)}</datalist>
             <input className="inp" placeholder="GPU" list="gpu-list" value={form.gpu} onChange={e => setForm(f => ({ ...f, gpu: e.target.value }))} />
             <datalist id="gpu-list">{opts.gpu.map(v => <option key={v} value={v} />)}</datalist>
-            <input className="inp" placeholder="Накопитель" list="storage-list" value={form.storage} onChange={e => setForm(f => ({ ...f, storage: e.target.value }))} />
+            <input className="inp" placeholder={tt("Накопитель")} list="storage-list" value={form.storage} onChange={e => setForm(f => ({ ...f, storage: e.target.value }))} />
             <datalist id="storage-list">{opts.storage.map(v => <option key={v} value={v} />)}</datalist>
-            <input className="inp" placeholder="Цвет" list="color-list" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+            <input className="inp" placeholder={tt("Цвет")} list="color-list" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
             <datalist id="color-list">{opts.color.map(v => <option key={v} value={v} />)}</datalist>
-            <input className="inp" placeholder="Экран" list="screen-list" value={form.screen} onChange={e => setForm(f => ({ ...f, screen: e.target.value }))} />
+            <input className="inp" placeholder={tt("Экран")} list="screen-list" value={form.screen} onChange={e => setForm(f => ({ ...f, screen: e.target.value }))} />
             <datalist id="screen-list">{opts.screen.map(v => <option key={v} value={v} />)}</datalist>
             <select className="inp" value={form.touch} onChange={e => setForm(f => ({ ...f, touch: e.target.value }))}>
-              <option value="no">Сенсор: Нет</option><option value="yes">Сенсор: Да</option>
+              <option value="no">{tt("Сенсор")}: {tt("Нет")}</option><option value="yes">{tt("Сенсор")}: {tt("Да")}</option>
             </select>
-            <input className="inp" type="number" placeholder="Закупка ¥ (скрыто)" value={form.cost_cny} onChange={e => setForm(f => ({ ...f, cost_cny: e.target.value }))} />
+            <input className="inp" type="number" placeholder={tt("Закупка ¥ (скрыто)")} value={form.cost_cny} onChange={e => setForm(f => ({ ...f, cost_cny: e.target.value }))} />
             <div>
-              <input className="inp" type="number" placeholder="Цена продажи ¥" value={form.price_sell_cny} onChange={e => setForm(f => ({ ...f, price_sell_cny: e.target.value }))} />
+              <input className="inp" type="number" placeholder={tt("Цена продажи ¥")} value={form.price_sell_cny} onChange={e => setForm(f => ({ ...f, price_sell_cny: e.target.value }))} />
               {form.price_sell_cny && rate > 0 && <div className="text-xs text-text3 mt-1">≈ {Math.round(form.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>}
             </div>
-            <input className="inp" type="number" placeholder="Мин. остаток (уведомление)" value={form.low_stock_threshold} onChange={e => setForm(f => ({ ...f, low_stock_threshold: e.target.value }))} />
-            <input className="inp" placeholder="ITEM (код с коробки производителя)" value={form.mfr_item_code} onChange={e => setForm(f => ({ ...f, mfr_item_code: e.target.value }))} />
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_hot} onChange={e => setForm(f => ({ ...f, is_hot: e.target.checked }))} /> 🔥 Хит продаж</label>
+            <input className="inp" type="number" placeholder={tt("Мин. остаток (уведомление)")} value={form.low_stock_threshold} onChange={e => setForm(f => ({ ...f, low_stock_threshold: e.target.value }))} />
+            <input className="inp" placeholder={tt("ITEM (код с коробки производителя)")} value={form.mfr_item_code} onChange={e => setForm(f => ({ ...f, mfr_item_code: e.target.value }))} />
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_hot} onChange={e => setForm(f => ({ ...f, is_hot: e.target.checked }))} /> 🔥 {tt("Хит продаж")}</label>
           </div>
           <div className="mb-3">
-            <label className="block text-[11px] text-text2 font-bold uppercase mb-1">Фото (ссылки)</label>
+            <label className="block text-[11px] text-text2 font-bold uppercase mb-1">{tt("Фото (ссылки)")}</label>
             {form.images.map((url, i) => (
               <div key={i} className="flex gap-2 mb-1">
                 <input className="inp" placeholder="https://..." value={url} onChange={e => updateImage(i, e.target.value)} />
                 <button type="button" className="btn btn-danger btn-sm" onClick={() => setForm(f => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }))}>✕</button>
               </div>
             ))}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setForm(f => ({ ...f, images: [...f.images, ''] }))}>+ Фото</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setForm(f => ({ ...f, images: [...f.images, ''] }))}>+ {tt("Фото")}</button>
           </div>
           <button className="btn btn-primary">{t('save')}</button>
         </form>
       )}
 
       <div className="flex gap-2 flex-wrap mb-3">
-        <input className="inp flex-1 min-w-[160px]" placeholder="Поиск... (серийник, ITEM, ID модели)" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="inp flex-1 min-w-[160px]" placeholder={tt("Поиск... (серийник, ITEM, ID модели)")} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       {serialMatches.length > 0 && (
         <div className="card mb-4">
-          <div className="font-bold text-sm mb-2">🔍 Найдено по серийному номеру</div>
+          <div className="font-bold text-sm mb-2">🔍 {tt("Найдено по серийному номеру")}</div>
           {serialMatches.map(m => (
             <Link key={m.id} to={`/serials/${m.id}`} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
               <span className="font-mono">{m.serial}</span>
@@ -278,25 +318,25 @@ export default function Warehouse() {
         </div>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 mb-4">
-        {[['brand', 'Бренд'], ['series', 'Серия'], ['cpu', 'CPU'], ['ram', 'RAM'], ['gpu', 'GPU'], ['storage', 'Накопитель'], ['color', 'Цвет'], ['screen', 'Экран']].map(([k, label]) => (
+        {[['brand', tt('Бренд')], ['series', tt('Серия')], ['cpu', 'CPU'], ['ram', 'RAM'], ['gpu', 'GPU'], ['storage', tt('Накопитель')], ['color', tt('Цвет')], ['screen', tt('Экран')]].map(([k, label]) => (
           <select key={k} className="inp text-xs" value={filters[k]} onChange={e => setFilters(f => ({ ...f, [k]: e.target.value }))}>
             <option value="">{label}</option>
             {filterOpts[k].map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         ))}
         <select className="inp text-xs" value={filters.touch} onChange={e => setFilters(f => ({ ...f, touch: e.target.value }))}>
-          <option value="">Сенсор</option>
-          {filterOpts.touch.includes('yes') && <option value="yes">Да</option>}
-          {filterOpts.touch.includes('no') && <option value="no">Нет</option>}
+          <option value="">{tt("Сенсор")}</option>
+          {filterOpts.touch.includes('yes') && <option value="yes">{tt("Да")}</option>}
+          {filterOpts.touch.includes('no') && <option value="no">{tt("Нет")}</option>}
         </select>
         <select className="inp text-xs" value={filters.hot} onChange={e => setFilters(f => ({ ...f, hot: e.target.value }))}>
-          <option value="">🔥 Хит</option><option value="yes">Да</option><option value="no">Нет</option>
+          <option value="">🔥 {tt("Хит")}</option><option value="yes">{tt("Да")}</option><option value="no">{tt("Нет")}</option>
         </select>
         <select className="inp text-xs" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
-          <option value="">Статус</option><option value="instock">Есть</option><option value="empty">Нет</option>
+          <option value="">{tt("Статус")}</option><option value="instock">{tt("Есть")}</option><option value="empty">{tt("Нет")}</option>
         </select>
         {Object.values(filters).some(v => v) && (
-          <button className="btn btn-danger btn-sm text-xs" onClick={() => setFilters({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' })}>✕ Сбросить</button>
+          <button className="btn btn-danger btn-sm text-xs" onClick={() => setFilters({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' })}>✕ {tt('Сбросить')}</button>
         )}
       </div>
 
@@ -305,10 +345,10 @@ export default function Warehouse() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
-                <th className="pb-2 pl-4 pt-3">Фото</th>
+                <th className="pb-2 pl-4 pt-3">{tt("Фото")}</th>
                 {th('brand', t('model'))}
-                <th className="pb-2">GPU</th><th className="pb-2">Цвет</th>
-                {th('price', 'Цена')}
+                <th className="pb-2">GPU</th><th className="pb-2">{tt("Цвет")}</th>
+                {th('price', tt('Цена'))}
                 {th('stock', t('inStock'))}
                 <th className="pb-2 pr-4"></th>
               </tr>
@@ -329,19 +369,29 @@ export default function Warehouse() {
                   <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
                   <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
                   <td className="py-2">
-                    <div className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</div>
-                    <div className="text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</div>
+                        <div className="text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>
+                      </div>
+                      <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
+                    </div>
                   </td>
                   <td className="py-2">
                     <span className={`font-mono font-bold ${Number(l.in_stock) <= Number(l.low_stock_threshold) && Number(l.in_stock) > 0 ? 'text-red' : Number(l.in_stock) > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
                     <span className="text-text3 text-xs">/{l.total}</span>
+                    {l.days_left_forecast !== null && Number(l.in_stock) > 0 && (
+                      <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
+                        ~{l.days_left_forecast} {tt('дн. запаса')}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 pr-4 text-right">
                     {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => remove(l.id)}>✕</button>}
                   </td>
                 </tr>
               ))}
-              {!filtered.length && <tr><td colSpan={7} className="text-center py-8 text-text3">Нет ноутбуков</td></tr>}
+              {!filtered.length && <tr><td colSpan={7} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
             </tbody>
           </table>
         </div>

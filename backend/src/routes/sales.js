@@ -2,15 +2,24 @@ const express = require('express');
 const pool = require('../db/pool');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { sendTelegramMessage } = require('../utils/telegram');
 const router = express.Router();
 
 router.get('/', authenticate, requirePermission('sales', 'view'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT s.*, c.name AS client_name,
-        COALESCE(json_agg(si.*) FILTER (WHERE si.id IS NOT NULL), '[]') AS items
+        COALESCE(json_agg(json_build_object(
+          'id', si.id, 'laptop_id', si.laptop_id, 'qty', si.qty,
+          'price_sell_cny', si.price_sell_cny, 'price_sell_rub', si.price_sell_rub,
+          'price_cost_cny', si.price_cost_cny, 'total_cny', si.total_cny,
+          'brand', l.brand, 'series', l.series, 'cpu', l.cpu, 'gpu', l.gpu,
+          'ram', l.ram, 'storage', l.storage, 'color', l.color, 'screen', l.screen,
+          'serials', (SELECT array_agg(sr.serial) FROM serials sr WHERE sr.id = ANY(si.serial_ids))
+        )) FILTER (WHERE si.id IS NOT NULL), '[]') AS items
       FROM sales s LEFT JOIN clients c ON c.id=s.client_id
       LEFT JOIN sale_items si ON si.sale_id=s.id
+      LEFT JOIN laptops l ON l.id = si.laptop_id
       GROUP BY s.id, c.name
       ORDER BY s.created_at DESC
     `);
@@ -83,9 +92,9 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
     }
 
     const sale = await client.query(
-      `INSERT INTO sales (client_id, total_cny, total_rub, rate, payment_mode, note)
-       VALUES ($1,$2,0,$3,$4,$5) RETURNING *`,
-      [client_id || null, finalCny, rate, payment_mode || 'full', note || null]
+      `INSERT INTO sales (client_id, total_cny, total_rub, rate, payment_mode, note, created_by)
+       VALUES ($1,$2,0,$3,$4,$5,$6) RETURNING *`,
+      [client_id || null, finalCny, rate, payment_mode || 'full', note || null, req.user.id]
     );
     await client.query('UPDATE sales SET total_rub=$1 WHERE id=$2', [finalRub, sale.rows[0].id]);
 
@@ -162,6 +171,18 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
 
     await client.query('COMMIT');
     await logActivity(req.user, 'Продажа', 'sale', resolvedItems.reduce((n, r) => n + r.qty, 0) + ' шт., ' + Math.round(finalRub).toLocaleString('ru-RU') + ' ₽');
+
+    // Уведомление клиенту в Telegram — не блокирует ответ, если упадёт
+    if (client_id) {
+      const clRes = await pool.query('SELECT name, telegram FROM clients WHERE id=$1', [client_id]);
+      if (clRes.rows[0]?.telegram) {
+        const itemsText = resolvedItems.map(r => `${r.laptop.brand} ${r.laptop.series} × ${r.qty}`).join('\n');
+        sendTelegramMessage(clRes.rows[0].telegram,
+          `🐼 BlackPanda\n\nСпасибо за покупку, ${clRes.rows[0].name}!\n\n${itemsText}\n\nИтого: ${Math.round(finalRub).toLocaleString('ru-RU')} ₽`
+        ).catch(() => {});
+      }
+    }
+
     res.status(201).json(sale.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');

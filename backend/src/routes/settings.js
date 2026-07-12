@@ -8,9 +8,17 @@ router.get('/', authenticate, requirePermission('settings', 'view'), async (req,
   try {
     const result = await pool.query('SELECT * FROM settings WHERE id=1');
     const row = result.rows[0];
-    // Токен бота на фронт не отдаём — только признак того, что он задан
-    res.json({ ...row, tg_token: undefined, tg_token_set: !!row.tg_token });
+    // Токен бота и ключ ИИ на фронт не отдаём — только признак того, что они заданы
+    res.json({ ...row, tg_token: undefined, tg_token_set: !!row.tg_token, ai_api_key: undefined, ai_key_set: !!row.ai_api_key });
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
+// Ключ ИИ хранится и используется только на сервере — не уходит в браузер
+router.put('/ai-key', authenticate, requirePermission('settings', 'edit'), async (req, res) => {
+  const { ai_api_key } = req.body;
+  if (!ai_api_key) return res.status(400).json({ error: 'Укажите ключ' });
+  await pool.query('UPDATE settings SET ai_api_key=$1 WHERE id=1', [ai_api_key]);
+  res.json({ success: true });
 });
 
 // Обновление курса — также пишем точку в историю для графика

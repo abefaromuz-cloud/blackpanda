@@ -16,7 +16,10 @@ router.get('/stats', authenticate, requirePermission('clients', 'view'), async (
   try {
     const [totals, debtTotal, turnover, settings] = await Promise.all([
       pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE category='vip') AS vip_count FROM clients`),
-      pool.query(`SELECT COALESCE(SUM(amount_rub - amount_paid_rub),0) AS total FROM debts WHERE status='open'`),
+      pool.query(`SELECT COALESCE(SUM(
+        CASE WHEN amount_cny IS NOT NULL THEN (amount_cny - amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+        ELSE (amount_rub - amount_paid_rub) END
+      ),0) AS total FROM debts WHERE status='open'`),
       pool.query(`SELECT COALESCE(SUM(total_rub),0) AS total FROM sales WHERE created_at > now() - interval '30 days'`),
       pool.query('SELECT rate FROM settings WHERE id=1'),
     ]);
@@ -38,7 +41,10 @@ router.get('/', authenticate, requirePermission('clients', 'view'), async (req, 
       SELECT c.*, u.full_name AS manager_name,
         COALESCE(SUM(s.total_rub),0) AS total_purchases_rub, COUNT(s.id) AS purchases_count,
         MAX(s.created_at) AS last_purchase_at,
-        COALESCE((SELECT SUM(d.amount_rub - d.amount_paid_rub) FROM debts d WHERE d.client_id=c.id AND d.status='open'),0) AS open_debt_rub
+        COALESCE((SELECT SUM(
+          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+          ELSE (d.amount_rub - d.amount_paid_rub) END
+        ) FROM debts d WHERE d.client_id=c.id AND d.status='open'),0) AS open_debt_rub
       FROM clients c
       LEFT JOIN sales s ON s.client_id=c.id
       LEFT JOIN users u ON u.id = c.manager_id
@@ -218,13 +224,28 @@ router.post('/:id/debts/payoff', authenticate, requirePermission('finance', 'edi
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const rateRes = await client.query('SELECT rate FROM settings WHERE id=1');
+    const rate = Number(rateRes.rows[0].rate);
     const open = await client.query(`SELECT * FROM debts WHERE client_id=$1 AND status='open'`, [req.params.id]);
-    const total = open.rows.reduce((s, d) => s + (Number(d.amount_rub) - Number(d.amount_paid_rub)), 0);
+    // Долги в юанях (amount_cny задан) пересчитываются по СЕГОДНЯШНЕМУ курсу, а не по курсу на момент создания долга
+    let total = 0;
+    for (const d of open.rows) {
+      if (d.amount_cny) {
+        const remCny = Number(d.amount_cny) - Number(d.amount_paid_cny);
+        total += remCny * rate;
+      } else {
+        total += Number(d.amount_rub) - Number(d.amount_paid_rub);
+      }
+    }
     if (total > 0) {
-      await client.query(`UPDATE debts SET status='paid', amount_paid_rub=amount_rub WHERE client_id=$1 AND status='open'`, [req.params.id]);
+      await client.query(`
+        UPDATE debts SET status='paid', paid_at=now(),
+          amount_paid_rub = CASE WHEN amount_cny IS NULL THEN amount_rub ELSE amount_paid_rub END,
+          amount_paid_cny = CASE WHEN amount_cny IS NOT NULL THEN amount_cny ELSE amount_paid_cny END
+        WHERE client_id=$1 AND status='open'`, [req.params.id]);
       await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [total]);
-      await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Погашение долга клиента',$2,'other')`,
-        [total, req.params.id]);
+      await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,$2,$3,'other')`,
+        [total, `Погашение долга клиента (курс ${rate})`, req.params.id]);
     }
     await client.query('COMMIT');
     res.json({ paid_rub: total });
@@ -232,6 +253,64 @@ router.post('/:id/debts/payoff', authenticate, requirePermission('finance', 'edi
     await client.query('ROLLBACK');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   } finally { client.release(); }
+});
+
+// Точечное погашение ОДНОГО конкретного долга — целиком или частично. Если у долга указана
+// сумма в юанях — сумма к оплате всегда пересчитывается по курсу НА МОМЕНТ ЭТОЙ ОПЛАТЫ.
+router.post('/:id/debts/:debtId/pay', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
+  const { amount_rub } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const rateRes = await client.query('SELECT rate FROM settings WHERE id=1');
+    const rate = Number(rateRes.rows[0].rate);
+    const d = await client.query('SELECT * FROM debts WHERE id=$1 AND client_id=$2 FOR UPDATE', [req.params.debtId, req.params.id]);
+    if (!d.rows[0]) throw { status: 404, message: 'Долг не найден' };
+    const debt = d.rows[0];
+    const isCny = debt.amount_cny !== null;
+
+    let pay, newPaidRub, newPaidCny, isFullyPaid;
+    if (isCny) {
+      const remainingCny = Number(debt.amount_cny) - Number(debt.amount_paid_cny);
+      // amount_rub из запроса трактуем как "сколько рублей готовы заплатить сейчас" — переводим в юани по текущему курсу
+      const payCny = amount_rub ? Math.min((Number(amount_rub) / rate), remainingCny) : remainingCny;
+      pay = Math.round(payCny * rate * 100) / 100;
+      newPaidCny = Number(debt.amount_paid_cny) + payCny;
+      newPaidRub = Number(debt.amount_paid_rub) + pay;
+      isFullyPaid = newPaidCny >= Number(debt.amount_cny) - 0.01;
+    } else {
+      const remaining = Number(debt.amount_rub) - Number(debt.amount_paid_rub);
+      pay = amount_rub ? Math.min(Number(amount_rub), remaining) : remaining;
+      newPaidRub = Number(debt.amount_paid_rub) + pay;
+      newPaidCny = debt.amount_paid_cny;
+      isFullyPaid = newPaidRub >= Number(debt.amount_rub) - 0.01;
+    }
+
+    if (pay > 0) {
+      await client.query('UPDATE debts SET amount_paid_rub=$1, amount_paid_cny=$2, status=$3, paid_at=CASE WHEN $3=\'paid\' THEN now() ELSE paid_at END WHERE id=$4',
+        [newPaidRub, newPaidCny, isFullyPaid ? 'paid' : 'open', req.params.debtId]);
+      await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [pay]);
+      await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,$2,$3,'other')`,
+        [pay, isCny ? `Погашение долга (курс ${rate})` : 'Погашение долга (частично/полностью)', req.params.id]);
+    }
+    await client.query('COMMIT');
+    res.json({ paid_rub: pay });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  } finally { client.release(); }
+});
+
+// Редактировать сумму долга вручную (например, скорректировать ошибку)
+router.put('/:id/debts/:debtId', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
+  const { amount_rub, amount_cny, due_date } = req.body;
+  const result = await pool.query(
+    'UPDATE debts SET amount_rub=COALESCE($1,amount_rub), amount_cny=COALESCE($2,amount_cny), due_date=COALESCE($3,due_date) WHERE id=$4 AND client_id=$5 RETURNING *',
+    [amount_rub || null, amount_cny || null, due_date || null, req.params.debtId, req.params.id]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'Долг не найден' });
+  res.json(result.rows[0]);
 });
 
 // Отправить клиенту напоминание о долге в Telegram

@@ -4,14 +4,16 @@ import { Phone, Send, Wallet, ShoppingCart, Wrench, ClipboardList, History as Hi
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import { useTT } from '../i18n/useTT';
 
-const CATEGORY_LABEL = { retail: 'Розница', wholesale: 'Опт', vip: 'VIP' };
+const CATEGORY_LABEL_RU = { retail: 'Розница', wholesale: 'Опт', vip: 'VIP' };
 const CATEGORY_BADGE = { retail: 'badge-blue', wholesale: 'badge-purple', vip: 'badge-yellow' };
 
 export default function ClientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [c, setC] = useState(null);
+  const [rate, setRate] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [editing, setEditing] = useState(false);
@@ -20,24 +22,29 @@ export default function ClientDetail() {
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('clients', 'edit');
+  const tt = useTT();
 
   function load() { api.get(`/clients/${id}`).then(r => setC(r.data)); }
+  useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
   useEffect(load, [id]);
   useEffect(() => { api.get('/clients/managers-list').then(r => setManagers(r.data)); }, []);
   if (!c) return <div className="text-text3">{t('loading')}</div>;
 
   const openDebts = c.debts.filter(d => d.status === 'open');
-  const totalDebt = openDebts.reduce((s, d) => s + (Number(d.amount_rub) - Number(d.amount_paid_rub)), 0);
+  const totalDebt = openDebts.reduce((s, d) => {
+    if (d.amount_cny) return s + (Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate;
+    return s + (Number(d.amount_rub) - Number(d.amount_paid_rub));
+  }, 0);
   const daysAgo = c.last_purchase_at ? Math.floor((Date.now() - new Date(c.last_purchase_at)) / 86400000) : null;
 
   async function adjustBalance() {
     if (!adjustAmount) return;
-    await api.post(`/clients/${id}/balance`, { amount_rub: Number(adjustAmount), note: 'Ручная корректировка' });
+    await api.post(`/clients/${id}/balance`, { amount_rub: Number(adjustAmount), note: tt('Ручная корректировка') });
     setAdjustAmount(''); load();
   }
 
   async function resetBalance() {
-    const refund = confirm(`${t('resetBalance')}?\n\nOK — ${t('refundCash')}\nОтмена — просто обнулить`);
+    const refund = confirm(`${t('resetBalance')}?\n\nOK — ${t('refundCash')}\n${tt('Отмена — просто обнулить')}`);
     await api.post(`/clients/${id}/balance/reset`, { refund_cash: refund });
     load();
   }
@@ -48,9 +55,48 @@ export default function ClientDetail() {
     load();
   }
 
+  async function payOneDebt(debt) {
+    if (debt.amount_cny) {
+      const remainingCny = Number(debt.amount_cny) - Number(debt.amount_paid_cny);
+      const remainingRub = Math.round(remainingCny * rate);
+      const input = prompt(`${tt('Сумма к погашению в рублях (по текущему курсу')} ¥1=${rate}₽, ${tt('максимум')} ${remainingRub.toLocaleString('ru-RU')} ₽):`, remainingRub);
+      if (input === null) return;
+      const amount = Number(input);
+      if (!amount || amount <= 0) return;
+      await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: amount });
+      load();
+      return;
+    }
+    const remaining = Number(debt.amount_rub) - Number(debt.amount_paid_rub);
+    const input = prompt(`Сумма к погашению (максимум ${Math.round(remaining).toLocaleString('ru-RU')} ₽):`, Math.round(remaining));
+    if (input === null) return;
+    const amount = Number(input);
+    if (!amount || amount <= 0) return;
+    await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: amount });
+    load();
+  }
+
+  async function editDebt(debt) {
+    if (debt.amount_cny) {
+      const input = prompt(`${tt('Новая сумма долга')} (¥):`, debt.amount_cny);
+      if (input === null) return;
+      const amount = Number(input);
+      if (!amount || amount <= 0) return;
+      await api.put(`/clients/${id}/debts/${debt.id}`, { amount_cny: amount });
+      load();
+      return;
+    }
+    const input = prompt('Новая сумма долга (₽):', debt.amount_rub);
+    if (input === null) return;
+    const amount = Number(input);
+    if (!amount || amount <= 0) return;
+    await api.put(`/clients/${id}/debts/${debt.id}`, { amount_rub: amount });
+    load();
+  }
+
   async function remind(debtId) {
     const r = await api.post(`/clients/${id}/debts/remind`, { debt_id: debtId });
-    alert(r.data.ok ? 'Отправлено ✅' : 'Ошибка: ' + (r.data.error || '—'));
+    alert(r.data.ok ? tt('Отправлено') + ' ✅' : tt('Ошибка') + ': ' + (r.data.error || '—'));
   }
 
   function startEdit() {
@@ -88,14 +134,14 @@ export default function ClientDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black">{c.name}</h1>
-                <span className={`badge ${CATEGORY_BADGE[c.category] || 'badge-blue'}`}>{CATEGORY_LABEL[c.category] || c.category}</span>
+                <span className={`badge ${CATEGORY_BADGE[c.category] || 'badge-blue'}`}>{tt(CATEGORY_LABEL_RU[c.category]) || c.category}</span>
               </div>
               <div className="text-text3 text-sm mt-1">
                 {c.telegram && <span>✈️ {c.telegram} </span>}
                 {c.phone && <span>· {c.phone} </span>}
                 {c.city && <span>· 📍 {c.city}</span>}
               </div>
-              <div className="text-xs text-text3 mt-1">{daysAgo === null ? 'Покупок ещё не было' : daysAgo === 0 ? 'Последняя покупка сегодня' : `Последняя покупка ${daysAgo} дн. назад`}</div>
+              <div className="text-xs text-text3 mt-1">{daysAgo === null ? tt('Покупок ещё не было') : daysAgo === 0 ? tt('Последняя покупка сегодня') : `Последняя покупка ${daysAgo} дн. назад`}</div>
             </div>
           </div>
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
@@ -106,16 +152,16 @@ export default function ClientDetail() {
             <input className="inp" placeholder={t('name')} value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             <input className="inp" placeholder={t('phone')} value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
             <input className="inp" placeholder="Telegram" value={editForm.telegram} onChange={e => setEditForm(f => ({ ...f, telegram: e.target.value }))} />
-            <input className="inp" placeholder="Город" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+            <input className="inp" placeholder={tt("Город")} value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
             <select className="inp" value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
-              <option value="retail">Розница</option><option value="wholesale">Опт</option><option value="vip">VIP</option>
+              <option value="retail">{tt("Розница")}</option><option value="wholesale">{tt("Опт")}</option><option value="vip">VIP</option>
             </select>
-            <input className="inp" type="number" placeholder="Скидка %" value={editForm.discount_percent} onChange={e => setEditForm(f => ({ ...f, discount_percent: e.target.value }))} />
+            <input className="inp" type="number" placeholder={tt("Скидка %")} value={editForm.discount_percent} onChange={e => setEditForm(f => ({ ...f, discount_percent: e.target.value }))} />
             <select className="inp" value={editForm.manager_id} onChange={e => setEditForm(f => ({ ...f, manager_id: e.target.value }))}>
-              <option value="">— Менеджер —</option>
+              <option value="">— {tt("Менеджер")} —</option>
               {managers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
-            <input className="inp" placeholder="Ссылка на фото (аватар)" value={editForm.avatar_url} onChange={e => setEditForm(f => ({ ...f, avatar_url: e.target.value }))} />
+            <input className="inp" placeholder={tt("Ссылка на фото (аватар)")} value={editForm.avatar_url} onChange={e => setEditForm(f => ({ ...f, avatar_url: e.target.value }))} />
             <div className="col-span-2 md:col-span-4 flex gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>{t('cancel')}</button>
               <button className="btn btn-primary">{t('save')}</button>
@@ -127,10 +173,10 @@ export default function ClientDetail() {
       {canEdit && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           {c.telegram && <a href={`https://t.me/${c.telegram.replace('@', '')}`} target="_blank" rel="noreferrer" className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Send size={15} /><span className="text-xs font-bold">Telegram</span></a>}
-          {c.phone && <a href={`tel:${c.phone}`} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Phone size={15} /><span className="text-xs font-bold">Позвонить</span></a>}
-          <button onClick={newSale} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><ShoppingCart size={15} /><span className="text-xs font-bold">Новая продажа</span></button>
-          <button onClick={newService} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Wrench size={15} /><span className="text-xs font-bold">Сдать в сервис</span></button>
-          <button onClick={() => alert('Генерация PDF-договора скоро будет доступна 🐼')} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50 opacity-70"><ClipboardList size={15} /><span className="text-xs font-bold">PDF Договор</span></button>
+          {c.phone && <a href={`tel:${c.phone}`} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Phone size={15} /><span className="text-xs font-bold">{tt("Позвонить")}</span></a>}
+          <button onClick={newSale} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><ShoppingCart size={15} /><span className="text-xs font-bold">{tt("Новая продажа")}</span></button>
+          <button onClick={newService} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50"><Wrench size={15} /><span className="text-xs font-bold">{tt("Сдать в сервис")}</span></button>
+          <button onClick={() => alert(tt('Генерация PDF-договора скоро будет доступна') + ' 🐼')} className="card flex items-center gap-2 py-2.5 justify-center hover:border-accent/50 opacity-70"><ClipboardList size={15} /><span className="text-xs font-bold">PDF {tt("Договор")}</span></button>
         </div>
       )}
 
@@ -168,14 +214,26 @@ export default function ClientDetail() {
           <div className={`text-2xl font-black font-mono ${totalDebt > 0 ? 'text-red' : 'text-text3'}`}>
             {Math.round(totalDebt).toLocaleString('ru-RU')} ₽
           </div>
-          {totalDebt > 0 && canEdit && <button className="btn btn-primary mt-3" onClick={payOff}>✅ {t('payOffDebt')}</button>}
+          {totalDebt > 0 && canEdit && <button className="btn btn-primary mt-3" onClick={payOff}>✅ {t('payOffDebt')} ({tt('все')})</button>}
           {openDebts.length > 0 && (
             <div className="mt-3 space-y-1">
               {openDebts.map(d => (
                 <div key={d.id} className="flex justify-between items-center text-xs border-t border-border pt-2">
-                  <span>{new Date(d.created_at).toLocaleDateString('ru-RU')} {d.due_date && `· до ${new Date(d.due_date).toLocaleDateString('ru-RU')}`}</span>
-                  <span className="flex items-center gap-2">
-                    <b className="text-red">{Math.round(Number(d.amount_rub) - Number(d.amount_paid_rub)).toLocaleString('ru-RU')} ₽</b>
+                  <span>{new Date(d.created_at).toLocaleDateString('ru-RU')} {d.due_date && `· ${tt("до")} ${new Date(d.due_date).toLocaleDateString('ru-RU')}`}</span>
+                  <span className="flex items-center gap-2 flex-wrap justify-end">
+                    {d.amount_cny ? (
+                      <span>
+                        <span className="block text-[9px] text-text3 uppercase font-bold text-right">{tt('Долг в юанях ≈ рублей')}</span>
+                        <b className="text-red">¥{(Number(d.amount_cny) - Number(d.amount_paid_cny)).toLocaleString('ru-RU')} ≈ {Math.round((Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate).toLocaleString('ru-RU')} ₽</b>
+                      </span>
+                    ) : (
+                      <span>
+                        <span className="block text-[9px] text-text3 uppercase font-bold text-right">{tt('Долг в рублях')}</span>
+                        <b className="text-red">{Math.round(Number(d.amount_rub) - Number(d.amount_paid_rub)).toLocaleString('ru-RU')} ₽</b>
+                      </span>
+                    )}
+                    {canEdit && <button className="text-green hover:underline" onClick={() => payOneDebt(d)}>✓ {tt('Погасить')}</button>}
+                    {canEdit && <button className="text-text3 hover:text-text" onClick={() => editDebt(d)}>✏️</button>}
                     {c.telegram && <button className="text-accent2 hover:underline" onClick={() => remind(d.id)}>✈️ {t('remindDebt')}</button>}
                   </span>
                 </div>
@@ -209,7 +267,7 @@ export default function ClientDetail() {
       </div>
 
       <Link to={`/clients/${id}/history`} className="card flex items-center justify-center gap-2 py-3 hover:border-accent/50 text-accent2 font-semibold text-sm">
-        <HistoryIcon size={16} /> Смотреть всю историю →
+        <HistoryIcon size={16} /> {tt("Смотреть всю историю")} →
       </Link>
     </div>
   );

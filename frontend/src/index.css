@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #09090b; --bg2: #131316; --bg3: #1c1c1f; --bg4: #252529;
+  --border: #27272a;
+  --text: #f6f0ee; --text2: #a1a1aa; --text3: #71717a;
+}
+
+/* Светлая тема — переключается классом .light на <html> (см. Layout.jsx, кнопка ☀️/🌙) */
+html.light {
+  --bg: #f4f4f5; --bg2: #ffffff; --bg3: #f0f0f1; --bg4: #e4e4e7;
+  --border: #dddde1;
+  --text: #18181b; --text2: #52525b; --text3: #71717a;
+}
+
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; }
 h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
 
@@ -25,4 +38,17 @@ h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
   .badge-red { @apply bg-red/15 text-red; }
   .badge-yellow { @apply bg-yellow/15 text-yellow; }
   .badge-purple { @apply bg-purple/15 text-purple; }
+}
+
+/* Все таблицы, обёрнутые в overflow-x-auto, на узких экранах должны скроллиться вбок,
+   а не сжимать колонки с переносом текста на несколько строк (некрасиво и нечитаемо
+   на телефоне — см. страницы Продажи/Склад/Админка). Порог по ширине задаём в px,
+   чтобы таблица всегда имела достаточно места и решала сама, обрезать её или скроллить. */
+.overflow-x-auto > table,
+.overflow-x-auto table {
+  min-width: 640px;
+}
+.overflow-x-auto table th,
+.overflow-x-auto table td {
+  white-space: nowrap;
 }

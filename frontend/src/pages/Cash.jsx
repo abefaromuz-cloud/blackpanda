@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useLang } from '../i18n/LangContext';
+import { useTT } from '../i18n/useTT';
 
 // Эта страница специально не выведена в левое меню — открывается по кнопке
 // «Показать всю историю операций» со страницы Финансы.
@@ -9,6 +10,7 @@ export default function Cash() {
   const [data, setData] = useState(null);
   const [banks, setBanks] = useState([]);
   const { t } = useLang();
+  const tt = useTT();
 
   function load() {
     api.get('/cash').then(r => setData(r.data));
@@ -22,7 +24,7 @@ export default function Cash() {
     <div>
       <Link to="/finance" className="text-text3 text-sm hover:text-text2">← {t('finance')}</Link>
       <div className="flex justify-between items-center mt-2 mb-5">
-        <h1 className="text-2xl font-black">История операций</h1>
+        <h1 className="text-2xl font-black">{tt("История операций")}</h1>
         <div className="text-2xl font-black font-mono text-green">{Math.round(data.balance_rub).toLocaleString('ru-RU')} ₽</div>
       </div>
 
@@ -52,7 +54,7 @@ export default function Cash() {
                 <td className="py-2">
                   <span className={`badge ${l.type === 'in' ? 'badge-green' : 'badge-red'}`}>{l.type === 'in' ? t('income') : t('expense')}</span>
                   {l.bank_key && <span className="badge badge-blue ml-1">{l.bank_key}</span>}
-                  {l.category === 'exchanger' && <span className="badge badge-purple ml-1">обменник</span>}
+                  {l.category === 'exchanger' && <span className="badge badge-purple ml-1">{tt("обменник")}</span>}
                 </td>
                 <td className={`py-2 font-mono ${l.type === 'in' ? 'text-green' : 'text-red'}`}>
                   {l.type === 'in' ? '+' : '-'}{Math.round(l.amount_rub).toLocaleString('ru-RU')} ₽

@@ -29,11 +29,17 @@ router.get('/', authenticate, requirePermission('finance', 'view'), async (req, 
           COALESCE((SELECT SUM(si.price_cost_cny*si.qty * st.rate) FROM sale_items si CROSS JOIN (SELECT rate FROM settings WHERE id=1) st),0) AS lifetime_cost_rub,
           COALESCE((SELECT SUM(amount_rub) FROM cash_log WHERE type='out'),0) AS lifetime_expenses_rub
       `),
-      // Должники — как и раньше на дашборде
+      // Должники — как и раньше на дашборде, юаневые долги пересчитываются по сегодняшнему курсу
       pool.query(`
-        SELECT c.id, c.name, COALESCE(SUM(d.amount_rub - d.amount_paid_rub),0) AS debt_rub
+        SELECT c.id, c.name, COALESCE(SUM(
+          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+          ELSE (d.amount_rub - d.amount_paid_rub) END
+        ),0) AS debt_rub
         FROM clients c JOIN debts d ON d.client_id = c.id AND d.status='open'
-        GROUP BY c.id, c.name HAVING SUM(d.amount_rub - d.amount_paid_rub) > 0
+        GROUP BY c.id, c.name HAVING SUM(
+          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+          ELSE (d.amount_rub - d.amount_paid_rub) END
+        ) > 0
         ORDER BY debt_rub DESC
       `),
       // Сколько всего передано каждому обменнику

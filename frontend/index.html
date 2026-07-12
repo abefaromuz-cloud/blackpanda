@@ -6,6 +6,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <title>BlackPanda CRM</title>
+<script>
+  // Применяем сохранённую тему сразу, до отрисовки React — иначе будет видна вспышка не той темы
+  try { if (localStorage.getItem('bp_theme') === 'light') document.documentElement.classList.add('light'); } catch (e) {}
+</script>
 </head>
 <body class="bg-bg text-text">
 <div id="root"></div>

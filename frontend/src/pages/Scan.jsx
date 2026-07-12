@@ -5,9 +5,11 @@ import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { printReceipt } from '../utils/print';
 import { beep } from '../utils/sound';
 import { useLang } from '../i18n/LangContext';
+import { useTT } from '../i18n/useTT';
 
 export default function Scan() {
   const { t } = useLang();
+  const tt = useTT();
   const [step, setStep] = useState(1);
   const [scanInput, setScanInput] = useState('');
   const [scanned, setScanned] = useState([]); // {serial, status: 'ok'|'notfound'|'sold', laptop}
@@ -99,6 +101,19 @@ export default function Scan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanned.length]);
 
+  const [upsell, setUpsell] = useState({});
+  useEffect(() => {
+    groups.forEach(async g => {
+      if (upsell[g.laptop_id] === undefined) {
+        try {
+          const { data } = await api.get(`/ai/upsell/${g.laptop_id}`);
+          setUpsell(u => ({ ...u, [g.laptop_id]: data }));
+        } catch { setUpsell(u => ({ ...u, [g.laptop_id]: [] })); }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned.length]);
+
   function unitPrice(lid) {
     return priceOverrides[lid] !== undefined ? Number(priceOverrides[lid]) : (laptopPrices[lid] || 0);
   }
@@ -126,7 +141,7 @@ export default function Scan() {
       });
       resetWizard();
     } catch (e2) {
-      setErr(e2.response?.data?.error || 'Ошибка оформления продажи');
+      setErr(e2.response?.data?.error || tt('Ошибка оформления продажи'));
     }
   }
 
@@ -139,7 +154,7 @@ export default function Scan() {
       });
       resetWizard();
     } catch (e2) {
-      setErr(e2.response?.data?.error || 'Ошибка резервирования');
+      setErr(e2.response?.data?.error || tt('Ошибка резервирования'));
     }
   }
 
@@ -176,11 +191,11 @@ export default function Scan() {
               {scanned.map((s, i) => (
                 <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg mb-1 text-sm ${s.status === 'ok' ? 'bg-green/10 border border-green' : s.status === 'sold' ? 'bg-yellow/10 border border-yellow' : 'bg-red/10 border border-red'}`}>
                   {s.id ? (
-                    <Link to={`/serials/${s.id}`} target="_blank" className="font-mono hover:underline hover:text-accent2" title="Открыть карточку / историю серийника">{s.serial}</Link>
+                    <Link to={`/serials/${s.id}`} target="_blank" className="font-mono hover:underline hover:text-accent2" title={tt("Открыть карточку / историю серийника")}>{s.serial}</Link>
                   ) : (
                     <span className="font-mono">{s.serial}</span>
                   )}
-                  <span className="text-xs">{s.status === 'ok' ? `${s.brand} ${s.series}` : s.status === 'sold' ? 'уже продан/недоступен' : t('notFound')}</span>
+                  <span className="text-xs">{s.status === 'ok' ? `${s.brand} ${s.series}` : s.status === 'sold' ? tt('уже продан/недоступен') : t('notFound')}</span>
                   <button onClick={() => removeScanned(i)} className="text-text3 hover:text-red">✕</button>
                 </div>
               ))}
@@ -231,13 +246,23 @@ export default function Scan() {
                 ))}
               </tbody>
             </table></div>
+            {groups.some(g => (upsell[g.laptop_id] || []).length > 0) && (
+              <div className="bg-bg3 rounded-xl p-3 mb-3">
+                <div className="text-xs font-bold text-accent2 mb-1.5">🤝 {tt('Часто покупают вместе')}</div>
+                {groups.map(g => (upsell[g.laptop_id] || []).map(u => (
+                  <div key={u.id} className="text-xs text-text2 py-0.5">
+                    {g.brand} {g.series} → <b>{u.brand} {u.series}</b> <span className="text-text3">(¥{u.price_sell_cny}, {tt('вместе')} {u.together_count} {tt('раз')})</span>
+                  </div>
+                )))}
+              </div>
+            )}
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <label className="text-xs text-text2">{t('discount')}</label>
               <input className="inp w-32" type="number" value={discountRub} onChange={e => setDiscountRub(e.target.value)} />
               {client?.discount_percent > 0 && (
                 <button type="button" className="text-xs text-accent2 hover:underline"
                   onClick={() => setDiscountRub(Math.round(subtotalRub * Number(client.discount_percent) / 100))}>
-                  У клиента скидка {client.discount_percent}% — применить ({Math.round(subtotalRub * Number(client.discount_percent) / 100).toLocaleString('ru-RU')} ₽)
+                  {tt("У клиента скидка")} {client.discount_percent}% — {tt("применить")} ({Math.round(subtotalRub * Number(client.discount_percent) / 100).toLocaleString('ru-RU')} ₽)
                 </button>
               )}
             </div>

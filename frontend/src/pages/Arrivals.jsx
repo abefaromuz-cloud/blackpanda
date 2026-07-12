@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import { useTT } from '../i18n/useTT';
 
 export default function Arrivals() {
   const [report, setReport] = useState([]);
@@ -16,6 +17,7 @@ export default function Arrivals() {
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('arrivals', 'edit');
+  const tt = useTT();
 
   function load() {
     api.get('/arrivals').then(r => setReport(r.data));
@@ -31,7 +33,7 @@ export default function Arrivals() {
       laptop_id: laptopId, serials: list, cost_cny: costCny || null,
       arrival_date: date ? new Date(date).toISOString() : null, note,
     });
-    setMsg(`✅ Добавлено: ${data.created}${data.skipped ? `, пропущено дублей: ${data.skipped}` : ''}`);
+    setMsg(`✅ ${tt('Добавлено')}: ${data.created}${data.skipped ? `, ${tt('пропущено дублей')}: ${data.skipped}` : ''}`);
     setSerials(''); setCostCny(''); setNote(''); load();
   }
 
@@ -53,7 +55,7 @@ export default function Arrivals() {
             <input className="inp" type="number" placeholder={t('unitCost')} value={costCny} onChange={e => setCostCny(e.target.value)} />
             <input className="inp" placeholder={t('comment')} value={note} onChange={e => setNote(e.target.value)} />
           </div>
-          <textarea className="inp mb-3" rows={4} placeholder="Серийные номера, по одному в строке" value={serials} onChange={e => setSerials(e.target.value)} />
+          <textarea className="inp mb-3" rows={4} placeholder={tt("Серийные номера, по одному в строке")} value={serials} onChange={e => setSerials(e.target.value)} />
           <button className="btn btn-primary">{t('add')}</button>
           {msg && <div className="text-sm mt-2 text-green">{msg}</div>}
         </form>
@@ -62,19 +64,19 @@ export default function Arrivals() {
       <div className="card">
         <div className="flex justify-between items-center mb-3">
           <div className="font-bold text-sm">{t('arrivalReport')}</div>
-          <div className="text-xs text-text3">Всего пришло: <b className="text-text">{grandTotal}</b> шт.</div>
+          <div className="text-xs text-text3">{tt("Всего пришло")}: <b className="text-text">{grandTotal}</b> {tt("шт.")}</div>
         </div>
         {report.length === 0 && <div className="text-text3 text-sm">—</div>}
         {report.map(day => (
           <div key={day.date} className="border-b border-border last:border-0 py-3">
             <div className="flex justify-between items-center mb-2">
               <span className="font-bold text-sm">{new Date(day.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-              <span className="text-xs text-text3">{day.totalQty} шт. {day.totalCostCny > 0 && `· ¥${Math.round(day.totalCostCny)}`}</span>
+              <span className="text-xs text-text3">{day.totalQty} {tt("шт.")} {day.totalCostCny > 0 && `· ¥${Math.round(day.totalCostCny)}`}</span>
             </div>
             {day.items.map((it, i) => (
               <Link key={i} to={`/warehouse/${it.laptop_id}`} className="flex justify-between text-sm py-1 hover:text-accent2">
                 <span>{it.brand} {it.series}</span>
-                <span className="font-mono text-text3">{it.qty} шт. {it.avg_cost_cny > 0 && `· ¥${Math.round(it.avg_cost_cny)}/шт`}</span>
+                <span className="font-mono text-text3">{it.qty} {tt("шт.")} {it.avg_cost_cny > 0 && `· ¥${Math.round(it.avg_cost_cny)}/${tt("шт")}`}</span>
               </Link>
             ))}
           </div>

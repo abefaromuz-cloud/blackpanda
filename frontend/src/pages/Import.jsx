@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import api from '../api/client';
+import { useTT } from '../i18n/useTT';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 
 function LegacyImportBlock({ canEdit }) {
+  const tt = useTT();
   const [fileName, setFileName] = useState('');
   const [result, setResult] = useState(null);
   const [err, setErr] = useState('');
@@ -22,7 +24,7 @@ function LegacyImportBlock({ canEdit }) {
         const { data: res } = await api.post('/import/legacy-backup', data);
         setResult(res.counts);
       } catch (e2) {
-        setErr(e2.response?.data?.error || 'Не удалось разобрать файл — убедись, что это JSON-бэкап из старой версии');
+        setErr(e2.response?.data?.error || tt('Не удалось разобрать файл — убедись, что это JSON-бэкап из старой версии'));
       } finally { setLoading(false); }
     };
     reader.readAsText(file);
@@ -30,25 +32,23 @@ function LegacyImportBlock({ canEdit }) {
 
   return (
     <div className="card mb-5 border-accent/40">
-      <div className="font-bold text-sm mb-2">🐼 Импорт из старой версии (HTML/Firebase)</div>
+      <div className="font-bold text-sm mb-2">🐼 {tt("Импорт из старой версии (HTML/Firebase)")}</div>
       <div className="text-xs text-text3 mb-3">
-        В старой CRM нажми «Бэкап данных» — скачается файл вида <code className="text-accent2">BlackPanda_backup_....json</code>.
-        Загрузи его сюда — перенесутся клиенты, склад, серийники, продажи, касса, курс и банковские счета.
-        <br /><b className="text-yellow">Запускай только один раз</b> — при повторном запуске клиенты и продажи продублируются
-        (серийники защищены от дублей уникальным номером).
+        {tt("В старой CRM нажми «Бэкап данных» — скачается файл вида")} <code className="text-accent2">BlackPanda_backup_....json</code>. {tt("Загрузи его сюда — перенесутся клиенты, склад, серийники, продажи, касса, курс и банковские счета.")}
+        <br /><b className="text-yellow">{tt("Запускай только один раз")}</b> — {tt("при повторном запуске клиенты и продажи продублируются (серийники защищены от дублей уникальным номером).")}
       </div>
       {canEdit && (
         <label className="btn btn-primary inline-block cursor-pointer">
-          {loading ? 'Импортируем...' : '📁 Выбрать файл бэкапа'}
+          {loading ? tt('Импортируем...') : '📁 ' + tt('Выбрать файл бэкапа')}
           <input type="file" accept=".json" className="hidden" onChange={handleFile} disabled={loading} />
         </label>
       )}
-      {fileName && <div className="text-xs text-text3 mt-2">Файл: {fileName}</div>}
+      {fileName && <div className="text-xs text-text3 mt-2">{tt("Файл")}: {fileName}</div>}
       {err && <div className="mt-3 text-sm text-red">{err}</div>}
       {result && (
         <div className="mt-3 text-sm text-green">
-          ✅ Импортировано: клиентов — {result.clients}, моделей — {result.laptops}, серийников — {result.serials},
-          продаж — {result.sales}, записей кассы — {result.cash}, долгов — {result.debts}
+          ✅ {tt("Импортировано: клиентов")} — {result.clients}, {tt("моделей")} — {result.laptops}, {tt("серийников")} — {result.serials},
+          {tt("продаж")} — {result.sales}, {tt("записей кассы")} — {result.cash}, {tt("долгов")} — {result.debts}
         </div>
       )}
     </div>
@@ -101,11 +101,28 @@ function ImportBlock({ title, columns, endpoint, mapRow, t, canEdit }) {
 export default function Import() {
   const { can } = useAuth();
   const { t } = useLang();
+  const tt = useTT();
   const canEdit = can('import', 'edit');
+
+  async function downloadBackup() {
+    const { data } = await api.get('/import/export-backup');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `blackpanda-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+  }
 
   return (
     <div>
       <h1 className="text-2xl font-black mb-6">{t('importPage')}</h1>
+      <div className="card mb-5 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div className="font-bold text-sm">💾 {tt('Резервная копия данных')}</div>
+          <div className="text-xs text-text3">{tt('Скачать все данные системы одним JSON-файлом — на всякий случай')}</div>
+        </div>
+        <button className="btn btn-secondary" onClick={downloadBackup}>⬇️ {tt('Скачать бэкап')}</button>
+      </div>
       <LegacyImportBlock canEdit={canEdit} />
       <ImportBlock
         title={t('importClients')}

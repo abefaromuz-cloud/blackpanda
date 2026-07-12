@@ -470,3 +470,101 @@ INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 -- Стартовые скидки по категории клиента (справочные значения, админ может менять руками у каждого клиента)
 UPDATE clients SET discount_percent = 5 WHERE category = 'vip' AND discount_percent = 0;
 UPDATE clients SET discount_percent = 3 WHERE category = 'wholesale' AND discount_percent = 0;
+
+-- Дополнительные позиции в одной заявке сервиса (когда клиент сдаёт сразу несколько устройств
+-- за один визит). Первая позиция хранится прямо в service_orders (как было), а сюда добавляются
+-- ВТОРАЯ и последующие — так не ломаем уже существующие заявки и код.
+CREATE TABLE IF NOT EXISTS service_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  service_order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'external',
+  serial_id UUID REFERENCES serials(id) ON DELETE SET NULL,
+  device_label TEXT,
+  issue TEXT,
+  is_warranty BOOLEAN NOT NULL DEFAULT false,
+  cost_rub NUMERIC(12,2) DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Сервис: переход на мультипозиционные заявки — одна заявка (клиент, дата, статус) может
+-- содержать несколько устройств/позиций (как было в старой версии — svcAddItem).
+CREATE TABLE IF NOT EXISTS service_order_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  service_order_id UUID NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'external', -- own_stock | external
+  serial_id UUID REFERENCES serials(id) ON DELETE SET NULL,
+  device_label TEXT,
+  issue TEXT,
+  is_warranty BOOLEAN NOT NULL DEFAULT false,
+  cost_rub NUMERIC(12,2) DEFAULT 0,
+  technician TEXT,
+  status TEXT NOT NULL DEFAULT 'in_progress', -- in_progress | done | issued | declined
+  return_status TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE service_order_items ADD CONSTRAINT service_order_items_order_fk
+  FOREIGN KEY (service_order_id) REFERENCES service_orders(id) ON DELETE CASCADE;
+
+-- Разовая идемпотентная миграция: переносим уже существующие одно-позиционные заявки в
+-- новую таблицу позиций (если ещё не перенесены), затем убираем позиционные поля из заявки.
+INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at)
+  SELECT id, kind, serial_id, device_label, issue, is_warranty, cost_rub, technician, status, created_at
+  FROM service_orders so
+  WHERE NOT EXISTS (SELECT 1 FROM service_order_items soi WHERE soi.service_order_id = so.id)
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_orders' AND column_name='kind');
+
+ALTER TABLE service_orders DROP COLUMN IF EXISTS kind;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS serial_id;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS device_label;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS issue;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS is_warranty;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS cost_rub;
+ALTER TABLE service_orders DROP COLUMN IF EXISTS technician;
+
+-- Ключ Anthropic API для функций ИИ (хранится только на сервере, фронту отдаётся лишь флаг "задан")
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS ai_api_key TEXT DEFAULT '';
+
+-- Черновики персонализированных ИИ-рассылок — требуют одобрения менеджера перед отправкой
+CREATE TABLE IF NOT EXISTS broadcast_drafts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  message_text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft', -- draft | approved | sent | rejected
+  batch_id UUID NOT NULL DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Кто оформил продажу — нужно для аналитики "эффективность менеджеров"
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id);
+
+-- Дата фактического погашения долга — для честного расчёта среднего срока оплаты в Аналитике
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+
+-- Ценообразование предзаказа: наценка зависит от % предоплаты (0% -> 9%, 50% -> 6%, 100% -> 3%),
+-- логистика 200 или 300 юаней за позицию. Долг за непредоплаченный остаток хранится В ЮАНЯХ —
+-- при погашении пересчитывается по курсу на момент оплаты, а не по курсу на момент заказа.
+ALTER TABLE preorders ADD COLUMN IF NOT EXISTS prepayment_pct NUMERIC(5,2) NOT NULL DEFAULT 0;
+ALTER TABLE preorders ADD COLUMN IF NOT EXISTS markup_pct NUMERIC(5,2) NOT NULL DEFAULT 9;
+ALTER TABLE preorders ADD COLUMN IF NOT EXISTS total_cny NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paid_cny NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE preorder_items ADD COLUMN IF NOT EXISTS logistics_cny NUMERIC(12,2) NOT NULL DEFAULT 200;
+
+-- Долг, привязанный к предзаказу, может быть выражен в юанях (amount_cny) — тогда РЕАЛЬНАЯ
+-- сумма к оплате в рублях всегда пересчитывается по текущему курсу, а не фиксируется один раз.
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS amount_cny NUMERIC(12,2);
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS amount_paid_cny NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS preorder_id UUID REFERENCES preorders(id) ON DELETE SET NULL;
+
+-- История изменения цены продажи модели — для мини-графика и стрелки роста/падения на Складе
+CREATE TABLE IF NOT EXISTS price_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  laptop_id UUID NOT NULL REFERENCES laptops(id) ON DELETE CASCADE,
+  price_cny NUMERIC(12,2) NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Разовая идемпотентная миграция: заносим текущую цену каждой модели как первую точку истории,
+-- если по ней ещё вообще нет ни одной записи
+INSERT INTO price_history (laptop_id, price_cny, changed_at)
+  SELECT id, price_sell_cny, created_at FROM laptops l
+  WHERE NOT EXISTS (SELECT 1 FROM price_history ph WHERE ph.laptop_id = l.id);

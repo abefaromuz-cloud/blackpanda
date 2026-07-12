@@ -19,6 +19,22 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
   const client = await pool.connect();
   const clientIdMap = {}, laptopIdMap = {}, serialIdMap = {}, saleIdMap = {};
   const counts = { clients: 0, laptops: 0, serials: 0, sales: 0, cash: 0, debts: 0 };
+  let placeholderClientId = null;
+
+  // Продажа в новой системе обязательно привязана к клиенту. Если в старом бэкапе у продажи
+  // клиент не указан или ссылается на уже несуществующего/удалённого клиента — вместо падения
+  // импорта создаём (один раз) служебного клиента-заглушку и вешаем такие продажи на него,
+  // чтобы данные не терялись и импорт не прерывался на середине.
+  async function getPlaceholderClientId() {
+    if (placeholderClientId) return placeholderClientId;
+    const existing = await client.query(`SELECT id FROM clients WHERE name='Без клиента (импорт)' LIMIT 1`);
+    if (existing.rows[0]) { placeholderClientId = existing.rows[0].id; return placeholderClientId; }
+    const created = await client.query(
+      `INSERT INTO clients (name, notes) VALUES ('Без клиента (импорт)', 'Создан автоматически при импорте — продажи без указанного клиента в старой системе') RETURNING id`
+    );
+    placeholderClientId = created.rows[0].id;
+    return placeholderClientId;
+  }
 
   try {
     await client.query('BEGIN');
@@ -71,7 +87,8 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
 
     // 4. Продажи
     for (const sale of (data.sales || [])) {
-      const clientId = sale.clientId ? (clientIdMap[sale.clientId] || null) : null;
+      let clientId = sale.clientId ? (clientIdMap[sale.clientId] || null) : null;
+      if (!clientId) clientId = await getPlaceholderClientId();
       const r = await client.query(
         `INSERT INTO sales (client_id, total_cny, total_rub, rate, payment_mode, note, created_at)
          VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,now())) RETURNING id`,
@@ -96,7 +113,7 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
       const newClientId = clientIdMap[c.id];
       if (!newClientId) continue;
       for (const d of (c.debts || [])) {
-        const amountRub = d.amountRub || (d.amountCny ? d.amountCny * (d.rateAtSale || sale?.rate || 13) : 0);
+        const amountRub = d.amountRub || (d.amountCny ? d.amountCny * (d.rateAtSale || 13) : 0);
         if (!amountRub) continue;
         await client.query(
           `INSERT INTO debts (client_id, sale_id, amount_rub, amount_paid_rub, due_date, status, created_at)
@@ -186,6 +203,30 @@ router.post('/laptops', authenticate, requirePermission('import', 'edit'), async
     await client.query('ROLLBACK');
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   } finally { client.release(); }
+});
+
+// Полный бэкап собственных данных — симметрично импорту из старой версии. Скачивает JSON
+// со всеми основными таблицами, чтобы можно было восстановить систему при необходимости.
+router.get('/export-backup', authenticate, requirePermission('import', 'view'), async (req, res) => {
+  try {
+    const tables = [
+      'clients', 'laptops', 'serials', 'serial_history', 'sales', 'sale_items',
+      'preorders', 'preorder_items', 'cash_log', 'debts', 'balance_history',
+      'bank_accounts', 'reservations', 'lib_brands', 'lib_series', 'lib_values',
+      'lib_statuses', 'employees', 'client_notes', 'tasks',
+    ];
+    const backup = { exported_at: new Date().toISOString(), version: 2 };
+    for (const t of tables) {
+      try {
+        const r = await pool.query(`SELECT * FROM ${t}`);
+        backup[t] = r.rows;
+      } catch (e) { backup[t] = []; }
+    }
+    const settingsRes = await pool.query('SELECT rate, cash_balance_rub FROM settings WHERE id=1');
+    backup.settings = settingsRes.rows[0];
+    res.setHeader('Content-Disposition', `attachment; filename="blackpanda-backup-${new Date().toISOString().slice(0, 10)}.json"`);
+    res.json(backup);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
 module.exports = router;

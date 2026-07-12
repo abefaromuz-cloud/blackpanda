@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
+import { useTT } from '../i18n/useTT';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function Login() {
       const user = await login(email, password);
       navigate(user.role === 'client' ? '/portal' : '/');
     } catch (e2) {
-      setErr(e2.response?.data?.error || 'Ошибка входа');
+      setErr(e2.response?.data?.error || tt('Ошибка входа'));
     } finally { setLoading(false); }
   }
 

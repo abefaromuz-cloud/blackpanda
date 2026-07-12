@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, ScanLine, Warehouse, PackagePlus, Library, Users,
   ClipboardList, ShoppingCart, Wrench, Wallet, BarChart3, FileText,
-  Megaphone, Upload, UserCog, History, Settings, ShieldCheck, Menu, X,
+  Megaphone, Upload, History, Settings, ShieldCheck, Menu, X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
@@ -26,7 +26,6 @@ const navItems = [
   { to: '/reports',   key: 'reports',   page: 'reports',   Icon: FileText },
   { to: '/broadcast', key: 'broadcast', page: 'broadcast', Icon: Megaphone },
   { to: '/import',    key: 'importPage',page: 'import',    Icon: Upload },
-  { to: '/employees', key: 'employees', page: 'employees', Icon: UserCog },
   { to: '/activity-log', key: 'activityLog', page: 'activity_log', Icon: History },
   { to: '/settings',  key: 'settings',  page: 'settings',  Icon: Settings },
 ];
@@ -38,6 +37,12 @@ export default function Layout() {
   const { t, lang, setLang } = useLang();
   const [order, setOrder] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('bp_theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('bp_theme', theme);
+  }, [theme]);
 
   useEffect(() => { api.get('/nav-order').then(r => setOrder(r.data.map(o => o.page_key))); }, []);
   // Закрываем мобильное меню при каждой смене страницы
@@ -58,7 +63,7 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen bg-bg">
       {/* Мобильная верхняя панель — видна только на маленьких экранах */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-bg2 border-b border-border flex items-center gap-3 px-4 py-3">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-bg2 border-b border-border flex items-center gap-3 px-4 py-3">
         <button onClick={() => setMobileOpen(true)} className="text-text2 hover:text-text">
           <Menu size={22} />
         </button>
@@ -68,13 +73,13 @@ export default function Layout() {
 
       {/* Затемнение фона при открытом мобильном меню */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setMobileOpen(false)} />
+        <div className="lg:hidden fixed inset-0 bg-black/60 z-40" onClick={() => setMobileOpen(false)} />
       )}
 
       <aside className={`
         w-72 bg-bg2 border-r border-border text-text flex flex-col flex-shrink-0
-        fixed md:static inset-y-0 left-0 z-50 transition-transform duration-200
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+        fixed lg:static inset-y-0 left-0 z-50 transition-transform duration-200
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
       `}>
         <div className="p-4 border-b border-border flex items-center gap-2.5">
           <img src="/logo.png" alt="" className="h-14 w-auto object-contain flex-shrink-0" />
@@ -82,7 +87,7 @@ export default function Layout() {
             <h1 className="text-xl font-black leading-none tracking-tight truncate">BlackPanda</h1>
             <p className="text-[10px] text-accent2 mt-1 font-semibold tracking-widest uppercase">CRM</p>
           </div>
-          <button onClick={() => setMobileOpen(false)} className="md:hidden text-text3 hover:text-text flex-shrink-0">
+          <button onClick={() => setMobileOpen(false)} className="lg:hidden text-text3 hover:text-text flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -122,10 +127,17 @@ export default function Layout() {
         </div>
 
         <div className="p-3 border-t border-border">
-          <button onClick={() => setLang(lang === 'ru' ? 'zh' : 'ru')}
-            className="w-full mb-2 text-xs px-3 py-1.5 rounded-xl border border-border text-text2 hover:text-text hover:border-accent transition">
-            {lang === 'ru' ? '中文' : 'RU'}
-          </button>
+          <div className="flex gap-2 mb-2">
+            <button onClick={() => setLang(lang === 'ru' ? 'zh' : 'ru')}
+              className="flex-1 text-xs px-3 py-1.5 rounded-xl border border-border text-text2 hover:text-text hover:border-accent transition">
+              {lang === 'ru' ? '中文' : 'RU'}
+            </button>
+            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+              className="flex-1 text-xs px-3 py-1.5 rounded-xl border border-border text-text2 hover:text-text hover:border-accent transition">
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
           <div className="rounded-xl bg-bg3 p-2.5">
             <p className="text-xs font-medium text-text truncate">{user?.full_name}</p>
             <p className="text-[10px] text-text3 mb-1.5">{roleLabels[lang]?.[user?.role] || user?.role}</p>
@@ -137,7 +149,7 @@ export default function Layout() {
       </aside>
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
-        <div className="flex-1 p-4 md:p-6 pt-20 md:pt-6 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-6 pt-20 lg:pt-6 overflow-y-auto">
           <Outlet />
         </div>
       </main>

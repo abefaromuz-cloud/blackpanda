@@ -5,11 +5,13 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels } from '../i18n/translations';
+import { useTT } from '../i18n/useTT';
 
 export default function Header() {
   const navigate = useNavigate();
   const { user, can } = useAuth();
   const { lang } = useLang();
+  const tt = useTT();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [showResults, setShowResults] = useState(false);
@@ -49,22 +51,22 @@ export default function Header() {
   const hasResults = results && (results.serials.length || results.laptops.length || results.clients.length);
 
   return (
-    <div className="hidden md:flex items-center gap-3 px-6 py-3 border-b border-border bg-bg2">
+    <div className="hidden lg:flex items-center gap-3 px-6 py-3 border-b border-border bg-bg2">
       <div className="relative flex-1 max-w-md" ref={boxRef}>
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text3" />
         <input
           className="inp pl-9"
-          placeholder="Поиск по серийному номеру, модели, клиенту..."
+          placeholder={tt("Поиск по серийному номеру, модели, клиенту...")}
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}
         />
         {showResults && results && (
           <div className="absolute top-full left-0 right-0 mt-1 card p-2 z-50 max-h-80 overflow-y-auto">
-            {!hasResults && <div className="text-text3 text-xs p-2">Ничего не найдено</div>}
+            {!hasResults && <div className="text-text3 text-xs p-2">{tt("Ничего не найдено")}</div>}
             {results.serials.length > 0 && (
               <div className="mb-2">
-                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">Серийники</div>
+                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">{tt("Серийники")}</div>
                 {results.serials.map(s => (
                   <button key={s.id} onClick={() => goTo(`/serials/${s.id}`)} className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg3 text-sm flex justify-between">
                     <span className="font-mono">{s.serial}</span><span className="text-text3">{s.brand} {s.series}</span>
@@ -74,7 +76,7 @@ export default function Header() {
             )}
             {results.laptops.length > 0 && (
               <div className="mb-2">
-                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">Модели</div>
+                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">{tt("Модели")}</div>
                 {results.laptops.map(l => (
                   <button key={l.id} onClick={() => goTo(`/warehouse/${l.id}`)} className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg3 text-sm">
                     {l.brand} {l.series}
@@ -84,7 +86,7 @@ export default function Header() {
             )}
             {results.clients.length > 0 && (
               <div>
-                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">Клиенты</div>
+                <div className="text-[10px] text-text3 uppercase font-bold px-2 mb-1">{tt("Клиенты")}</div>
                 {results.clients.map(c => (
                   <button key={c.id} onClick={() => goTo(`/clients/${c.id}`)} className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg3 text-sm flex justify-between">
                     <span>{c.name}</span><span className="text-text3">{c.phone}</span>
@@ -113,20 +115,20 @@ export default function Header() {
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-full mt-2 w-72 card p-3 z-50 max-h-80 overflow-y-auto">
-              {notifCount === 0 && <div className="text-text3 text-xs">Нет уведомлений</div>}
+              {notifCount === 0 && <div className="text-text3 text-xs">{tt("Нет уведомлений")}</div>}
               {notifData.lowStock.length > 0 && (
                 <div className="mb-2">
-                  <div className="text-[10px] text-yellow uppercase font-bold mb-1">⚠️ Заканчивается на складе</div>
+                  <div className="text-[10px] text-yellow uppercase font-bold mb-1">⚠️ {tt("Заканчивается на складе")}</div>
                   {notifData.lowStock.map(l => (
                     <button key={l.id} onClick={() => { setNotifOpen(false); navigate(`/warehouse/${l.id}`); }} className="w-full text-left text-xs py-1 hover:text-accent2">
-                      {l.brand} {l.series} — {l.in_stock} шт.
+                      {l.brand} {l.series} — {l.in_stock} {tt("шт.")}
                     </button>
                   ))}
                 </div>
               )}
               {notifData.debts.length > 0 && (
                 <div>
-                  <div className="text-[10px] text-red uppercase font-bold mb-1">💰 Должники</div>
+                  <div className="text-[10px] text-red uppercase font-bold mb-1">💰 {tt("Должники")}</div>
                   {notifData.debts.map(c => (
                     <button key={c.id} onClick={() => { setNotifOpen(false); navigate(`/clients/${c.id}`); }} className="w-full text-left text-xs py-1 hover:text-accent2 flex justify-between">
                       <span>{c.name}</span><span className="font-mono text-red">{Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>

@@ -3,12 +3,13 @@ import api from '../api/client';
 import { useLang } from '../i18n/LangContext';
 import { roleLabels, pageLabels } from '../i18n/translations';
 import DragReorderList from '../components/DragReorderList';
+import { useTT } from '../i18n/useTT';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
   'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library', 'arrivals', 'service'];
 const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preorders', 'sales',
-  'finance', 'analytics', 'reports', 'broadcast', 'import', 'employees', 'activity_log', 'settings', 'arrivals', 'service'];
+  'finance', 'analytics', 'reports', 'broadcast', 'import', 'activity_log', 'settings', 'arrivals', 'service'];
 
 export default function Admin() {
   const { t, lang } = useLang();
@@ -29,6 +30,7 @@ export default function Admin() {
 
 function NavOrderTab() {
   const { t, lang } = useLang();
+  const tt = useTT();
   const [order, setOrder] = useState(null);
 
   function load() {
@@ -50,7 +52,7 @@ function NavOrderTab() {
   return (
     <div className="card max-w-md">
       <div className="font-bold text-sm mb-1">{t('menuOrder')}</div>
-      <div className="text-xs text-text3 mb-3">Перетащи разделы, чтобы изменить порядок в меню — для всех пользователей сразу.</div>
+      <div className="text-xs text-text3 mb-3">{tt("Перетащи разделы, чтобы изменить порядок в меню — для всех пользователей сразу.")}</div>
       <DragReorderList
         items={order}
         getKey={o => o.page}
@@ -127,6 +129,7 @@ function UsersTab() {
       )}
 
       <div className="card">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
@@ -165,6 +168,7 @@ function UsersTab() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -172,6 +176,7 @@ function UsersTab() {
 
 function PermissionsTab() {
   const { t, lang } = useLang();
+  const tt = useTT();
   const [data, setData] = useState(null);
   const [selectedUser, setSelectedUser] = useState('');
   const [users, setUsers] = useState([]);
@@ -243,7 +248,7 @@ function PermissionsTab() {
             ))}
           </tbody>
         </table>
-        <div className="text-[11px] text-text3 mt-2">{t('view')} / {t('editPerm')} — админ всегда имеет полный доступ и в этой таблице не участвует.</div>
+        <div className="text-[11px] text-text3 mt-2">{t('view')} / {t('editPerm')} — {tt('админ всегда имеет полный доступ и в этой таблице не участвует.')}</div>
       </div>
 
       <div className="card overflow-x-auto">
@@ -269,7 +274,7 @@ function PermissionsTab() {
                 const v = override || roleDefault;
                 return (
                   <tr key={page} className="border-b border-border last:border-0">
-                    <td className="py-2">{pageLabels[lang][page]} {!override && <span className="text-text3 text-[10px]">(роль)</span>}</td>
+                    <td className="py-2">{pageLabels[lang][page]} {!override && <span className="text-text3 text-[10px]">({tt("роль")})</span>}</td>
                     <td className="py-2 text-center">
                       <input type="checkbox" checked={v.can_view} onChange={e => setUserPerm(selectedUser, page, { can_view: e.target.checked, can_edit: e.target.checked ? v.can_edit : false })} />
                     </td>

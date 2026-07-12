@@ -3,6 +3,7 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import DragReorderList from '../components/DragReorderList';
+import { useTT } from '../i18n/useTT';
 
 const CATS = [
   ['cpu', 'processors'], ['gpu', 'gpus'], ['ram', 'rams'],
@@ -35,6 +36,7 @@ export default function Library() {
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('library', 'edit');
+  const tt = useTT();
 
   function load() { api.get('/library').then(r => setData(r.data)); }
   useEffect(load, []);
@@ -56,7 +58,7 @@ export default function Library() {
     setNewBrand({ name: '', name_zh: '' }); load();
   }
   async function delBrand(id) {
-    if (!confirm('Удалить бренд и все его серии?')) return;
+    if (!confirm(tt('Удалить бренд и все его серии?'))) return;
     await api.delete(`/library/brands/${id}`); load();
   }
   async function reorderBrands(ids) { await api.put('/library/brands/reorder', { ids }); load(); }
@@ -93,8 +95,7 @@ export default function Library() {
     <div>
       <h1 className="text-2xl font-black mb-1">📚 {t('library')}</h1>
       <div className="text-xs text-text3 mb-5">
-        Всё остальное в интерфейсе уже переведено автоматически. Здесь — то, что пишешь сам: бренды, серии,
-        характеристики, статусы. Поля «оригинал ⚭ 中文» — одной ширины, растянуты на всю строку.
+        {tt("Всё остальное в интерфейсе уже переведено автоматически. Здесь — то, что пишешь сам: бренды, серии, характеристики, статусы. Поля «оригинал ⚭ 中文» — одной ширины, растянуты на всю строку.")}
       </div>
 
       <div className="card mb-4">
@@ -103,7 +104,7 @@ export default function Library() {
           {canEdit && (
             <form onSubmit={addBrand} className={`grid ${gridCols} gap-2 items-center w-full sm:w-auto sm:min-w-[420px]`}>
               <span />
-              <input className="inp inp-sm" placeholder="Название" value={newBrand.name} onChange={e => setNewBrand(b => ({ ...b, name: e.target.value }))} />
+              <input className="inp inp-sm" placeholder={tt("Название")} value={newBrand.name} onChange={e => setNewBrand(b => ({ ...b, name: e.target.value }))} />
               <span className="text-text3 text-xs text-center">⚭</span>
               <input className="inp inp-sm" placeholder="中文" value={newBrand.name_zh} onChange={e => setNewBrand(b => ({ ...b, name_zh: e.target.value }))} />
               <button className="btn btn-primary btn-sm">{t('addBrand')}</button>
@@ -163,27 +164,25 @@ export default function Library() {
 
       <div className="card mb-4">
         <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-          <div className="font-bold text-sm">🏷️ Статусы товара</div>
+          <div className="font-bold text-sm">🏷️ {tt("Статусы товара")}</div>
           {canEdit && (
             <form onSubmit={addStatus} className="flex gap-1.5 flex-wrap items-center">
-              <input className="inp inp-sm w-36" placeholder="Название статуса" value={newStatus.label} onChange={e => setNewStatus(s => ({ ...s, label: e.target.value }))} />
+              <input className="inp inp-sm w-36" placeholder={tt("Название статуса")} value={newStatus.label} onChange={e => setNewStatus(s => ({ ...s, label: e.target.value }))} />
               <span className="text-text3 text-xs">⚭</span>
               <input className="inp inp-sm w-36" placeholder="中文" value={newStatus.label_zh} onChange={e => setNewStatus(s => ({ ...s, label_zh: e.target.value }))} />
               <select className="inp inp-sm" value={newStatus.counts_as} onChange={e => setNewStatus(s => ({ ...s, counts_as: e.target.value }))}>
-                <option value="instock">Считать «в наличии»</option>
-                <option value="intransit">Считать «в пути»</option>
-                <option value="reserved">Считать «резерв»</option>
-                <option value="sold">Считать «продано»</option>
-                <option value="other">Не считать в остатках</option>
+                <option value="instock">{tt("Считать «в наличии»")}</option>
+                <option value="intransit">{tt("Считать «в пути»")}</option>
+                <option value="reserved">{tt("Считать «резерв»")}</option>
+                <option value="sold">{tt("Считать «продано»")}</option>
+                <option value="other">{tt("Не считать в остатках")}</option>
               </select>
-              <button className="btn btn-primary btn-sm">+ Статус</button>
+              <button className="btn btn-primary btn-sm">+ {tt("Статус")}</button>
             </form>
           )}
         </div>
         <div className="text-xs text-text3 mb-3">
-          «Считать в наличии» — товар с этим статусом учитывается на складе и его можно продать (например, «Склад (восст.)»).
-          «Не считать в остатках» — статус просто для информации (например, «На ремонте», «Потерян»).
-          Переименование статуса автоматически перенесётся на уже сохранённые товары с этим статусом.
+          {tt("«Считать в наличии» — товар с этим статусом учитывается на складе и его можно продать (например, «Склад (восст.)»). «Не считать в остатках» — статус просто для информации (например, «На ремонте», «Потерян»). Переименование статуса автоматически перенесётся на уже сохранённые товары с этим статусом.")}
         </div>
         <div className="grid grid-cols-[20px_1fr_20px_1fr_128px_20px] gap-x-2 gap-y-1.5 text-sm">
           <DragReorderList
@@ -199,11 +198,11 @@ export default function Library() {
                 {canEdit ? <EditableField value={s.label_zh} onSave={(v) => saveStatus(s.id, { label_zh: v })} placeholder="中文" /> : <span className="text-text3 text-xs truncate">{s.label_zh}</span>}
                 {canEdit ? (
                   <select className="inp inp-sm" value={s.counts_as} onChange={e => saveStatus(s.id, { counts_as: e.target.value })}>
-                    <option value="instock">в наличии</option>
-                    <option value="intransit">в пути</option>
-                    <option value="reserved">резерв</option>
-                    <option value="sold">продано</option>
-                    <option value="other">не считать</option>
+                    <option value="instock">{tt("в наличии")}</option>
+                    <option value="intransit">{tt("в пути")}</option>
+                    <option value="reserved">{tt("резерв")}</option>
+                    <option value="sold">{tt("продано")}</option>
+                    <option value="other">{tt("не считать")}</option>
                   </select>
                 ) : <span className="badge badge-blue text-[10px] justify-self-start">{s.counts_as}</span>}
                 {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => delStatus(s.id)}>✕</button>}

@@ -7,6 +7,8 @@ import { useLang } from '../i18n/LangContext';
 import { printSerialLabel } from '../utils/print';
 import { useStatuses } from '../hooks/useStatuses';
 import { useLibraryText } from '../hooks/useLibraryText';
+import { useTT } from '../i18n/useTT';
+import PriceSparkline from '../components/PriceSparkline';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { beep } from '../utils/sound';
 
@@ -73,7 +75,7 @@ export default function LaptopDetail() {
       beep(true); load();
     } catch (e2) {
       beep(false);
-      alert(e2.response?.data?.error || 'Ошибка добавления серийника');
+      alert(e2.response?.data?.error || tt('Ошибка добавления серийника'));
     }
   }
 
@@ -95,7 +97,7 @@ export default function LaptopDetail() {
   }
 
   async function deleteSerial(serialId) {
-    if (!confirm('Удалить серийник?')) return;
+    if (!confirm(tt('Удалить серийник?'))) return;
     await api.delete(`/serials/${serialId}`);
     load();
   }
@@ -119,7 +121,7 @@ export default function LaptopDetail() {
 
   async function reserveSelected() {
     if (!selected.length) return;
-    const clientId = prompt('ID клиента (необязательно, оставь пустым для резерва без клиента):') || null;
+    const clientId = prompt(tt('ID клиента (необязательно, оставь пустым для резерва без клиента):')) || null;
     await api.post('/reservations', { serials: selected, client_id: clientId });
     setSelected([]); load();
   }
@@ -144,7 +146,7 @@ export default function LaptopDetail() {
 
   const images = (l.images && l.images.length ? l.images : (l.image_url ? [l.image_url] : []));
   const inStockCount = l.serials.filter(s => isInStock(s.status_id)).length;
-  const overallStatus = inStockCount > 0 ? 'На складе' : (l.serials.length ? 'Нет в наличии' : '—');
+  const overallStatus = inStockCount > 0 ? tt('На складе') : (l.serials.length ? tt('Нет в наличии') : '—');
 
   return (
     <div>
@@ -155,7 +157,7 @@ export default function LaptopDetail() {
           <h1 className="text-xl font-black">
             {l.brand}{tr('brand', l.brand) !== l.brand ? ` / ${tr('brand', l.brand)}` : ''}
             {tr('series', l.series) !== l.series ? ` — ${tr('series', l.series)}` : ''}
-            {l.is_hot && <span className="badge badge-yellow ml-1">🔥 хит</span>}
+            {l.is_hot && <span className="badge badge-yellow ml-1">🔥 {tt("хит")}</span>}
           </h1>
           <div className="text-text3 text-sm">{l.series}</div>
         </div>
@@ -168,16 +170,16 @@ export default function LaptopDetail() {
 
       <div className="flex items-center gap-2 flex-wrap mb-5">
         <span className={`badge ${inStockCount > 0 ? 'badge-green' : 'badge-red'}`}>📦 {overallStatus}</span>
-        <span className="badge badge-yellow">{inStockCount} / {l.serials.length} шт.</span>
-        <span className="badge badge-blue">🕐 Добавлено: {new Date(l.created_at).toLocaleDateString('ru-RU')}</span>
+        <span className="badge badge-yellow">{inStockCount} / {l.serials.length} {tt("шт.")}</span>
+        <span className="badge badge-blue">🕐 {tt("Добавлено")}: {new Date(l.created_at).toLocaleDateString('ru-RU')}</span>
       </div>
 
       {editing ? (
         <form onSubmit={saveEdit} className="card mb-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <input className="inp" placeholder="Бренд" list="edit-brand-list" value={editForm.brand} onChange={e => setEditForm(f => ({ ...f, brand: e.target.value }))} required />
+            <input className="inp" placeholder={tt("Бренд")} list="edit-brand-list" value={editForm.brand} onChange={e => setEditForm(f => ({ ...f, brand: e.target.value }))} required />
             <datalist id="edit-brand-list">{(lib?.brands || []).map(b => <option key={b.id} value={b.name} />)}</datalist>
-            <input className="inp" placeholder="Серия" list="edit-series-list" value={editForm.series} onChange={e => setEditForm(f => ({ ...f, series: e.target.value }))} />
+            <input className="inp" placeholder={tt("Серия")} list="edit-series-list" value={editForm.series} onChange={e => setEditForm(f => ({ ...f, series: e.target.value }))} />
             <datalist id="edit-series-list">{(lib?.brands?.find(b => b.name === editForm.brand)?.series || []).map(s => <option key={s.id} value={s.name} />)}</datalist>
             <input className="inp" placeholder="CPU" list="edit-cpu-list" value={editForm.cpu} onChange={e => setEditForm(f => ({ ...f, cpu: e.target.value }))} />
             <datalist id="edit-cpu-list">{(lib?.values?.cpu || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
@@ -185,30 +187,30 @@ export default function LaptopDetail() {
             <datalist id="edit-ram-list">{(lib?.values?.ram || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
             <input className="inp" placeholder="GPU" list="edit-gpu-list" value={editForm.gpu} onChange={e => setEditForm(f => ({ ...f, gpu: e.target.value }))} />
             <datalist id="edit-gpu-list">{(lib?.values?.gpu || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
-            <input className="inp" placeholder="Накопитель" list="edit-storage-list" value={editForm.storage} onChange={e => setEditForm(f => ({ ...f, storage: e.target.value }))} />
+            <input className="inp" placeholder={tt("Накопитель")} list="edit-storage-list" value={editForm.storage} onChange={e => setEditForm(f => ({ ...f, storage: e.target.value }))} />
             <datalist id="edit-storage-list">{(lib?.values?.storage || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
-            <input className="inp" placeholder="Цвет" list="edit-color-list" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))} />
+            <input className="inp" placeholder={tt("Цвет")} list="edit-color-list" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))} />
             <datalist id="edit-color-list">{(lib?.values?.color || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
-            <input className="inp" placeholder="Экран" list="edit-screen-list" value={editForm.screen} onChange={e => setEditForm(f => ({ ...f, screen: e.target.value }))} />
+            <input className="inp" placeholder={tt("Экран")} list="edit-screen-list" value={editForm.screen} onChange={e => setEditForm(f => ({ ...f, screen: e.target.value }))} />
             <datalist id="edit-screen-list">{(lib?.values?.screen || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
             <select className="inp" value={editForm.touch} onChange={e => setEditForm(f => ({ ...f, touch: e.target.value }))}>
-              <option value="no">Сенсор: Нет</option><option value="yes">Сенсор: Да</option>
+              <option value="no">{tt("Сенсор")}: {tt("Нет")}</option><option value="yes">{tt("Сенсор")}: {tt("Да")}</option>
             </select>
-            <input className="inp" type="number" placeholder="Закупка ¥" value={editForm.cost_cny} onChange={e => setEditForm(f => ({ ...f, cost_cny: e.target.value }))} />
-            <input className="inp" type="number" placeholder="Цена продажи ¥" value={editForm.price_sell_cny} onChange={e => setEditForm(f => ({ ...f, price_sell_cny: e.target.value }))} />
-            <input className="inp" type="number" placeholder="Мин. остаток" value={editForm.low_stock_threshold} onChange={e => setEditForm(f => ({ ...f, low_stock_threshold: e.target.value }))} />
-            <input className="inp" placeholder="ITEM (код с коробки производителя)" value={editForm.mfr_item_code} onChange={e => setEditForm(f => ({ ...f, mfr_item_code: e.target.value }))} />
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editForm.is_hot} onChange={e => setEditForm(f => ({ ...f, is_hot: e.target.checked }))} /> 🔥 Хит</label>
+            <input className="inp" type="number" placeholder={tt("Закупка ¥")} value={editForm.cost_cny} onChange={e => setEditForm(f => ({ ...f, cost_cny: e.target.value }))} />
+            <input className="inp" type="number" placeholder={tt("Цена продажи ¥")} value={editForm.price_sell_cny} onChange={e => setEditForm(f => ({ ...f, price_sell_cny: e.target.value }))} />
+            <input className="inp" type="number" placeholder={tt("Мин. остаток")} value={editForm.low_stock_threshold} onChange={e => setEditForm(f => ({ ...f, low_stock_threshold: e.target.value }))} />
+            <input className="inp" placeholder={tt("ITEM (код с коробки производителя)")} value={editForm.mfr_item_code} onChange={e => setEditForm(f => ({ ...f, mfr_item_code: e.target.value }))} />
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editForm.is_hot} onChange={e => setEditForm(f => ({ ...f, is_hot: e.target.checked }))} /> 🔥 {tt("Хит")}</label>
           </div>
           <div className="mb-3">
-            <label className="block text-[11px] text-text2 font-bold uppercase mb-1">Фото</label>
+            <label className="block text-[11px] text-text2 font-bold uppercase mb-1">{tt("Фото")}</label>
             {editForm.images.map((url, i) => (
               <div key={i} className="flex gap-2 mb-1">
                 <input className="inp" value={url} onChange={e => setEditForm(f => { const imgs = [...f.images]; imgs[i] = e.target.value; return { ...f, images: imgs }; })} />
                 <button type="button" className="btn btn-danger btn-sm" onClick={() => setEditForm(f => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }))}>✕</button>
               </div>
             ))}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditForm(f => ({ ...f, images: [...f.images, ''] }))}>+ Фото</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditForm(f => ({ ...f, images: [...f.images, ''] }))}>+ {tt("Фото")}</button>
           </div>
           <div className="flex gap-2">
             <button className="btn btn-secondary" type="button" onClick={() => setEditing(false)}>{t('cancel')}</button>
@@ -234,15 +236,20 @@ export default function LaptopDetail() {
             ) : <div className="w-full h-44 bg-bg3 rounded-lg flex items-center justify-center text-text3 text-3xl">🐼</div>}
           </div>
           <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3">
-            <SpecBox Icon={SPEC_ICONS.screen[0]} iconClass={SPEC_ICONS.screen[1]} label="Диагональ" value={tr('screen', l.screen)} />
+            <SpecBox Icon={SPEC_ICONS.screen[0]} iconClass={SPEC_ICONS.screen[1]} label={tt("Диагональ")} value={tr('screen', l.screen)} />
             <SpecBox Icon={SPEC_ICONS.cpu[0]} iconClass={SPEC_ICONS.cpu[1]} label="CPU" value={tr('cpu', l.cpu)} />
             <SpecBox Icon={SPEC_ICONS.ram[0]} iconClass={SPEC_ICONS.ram[1]} label="RAM" value={tr('ram', l.ram)} />
-            <SpecBox Icon={SPEC_ICONS.storage[0]} iconClass={SPEC_ICONS.storage[1]} label="Накопитель" value={tr('storage', l.storage)} />
+            <SpecBox Icon={SPEC_ICONS.storage[0]} iconClass={SPEC_ICONS.storage[1]} label={tt("Накопитель")} value={tr('storage', l.storage)} />
             <SpecBox Icon={SPEC_ICONS.gpu[0]} iconClass={SPEC_ICONS.gpu[1]} label="GPU" value={tr('gpu', l.gpu)} />
-            <SpecBox Icon={SPEC_ICONS.color[0]} iconClass={SPEC_ICONS.color[1]} label="Цвет" value={tr('color', l.color)} />
-            <SpecBox Icon={SPEC_ICONS.touch[0]} iconClass={SPEC_ICONS.touch[1]} label="Сенсор" value={l.touch === 'yes' ? 'Да' : 'Нет'} />
-            <SpecBox Icon={SPEC_ICONS.stock[0]} iconClass={SPEC_ICONS.stock[1]} label="На складе" value={`${inStockCount} / ${l.serials.length}`} />
-            <SpecBox Icon={SPEC_ICONS.price[0]} iconClass={SPEC_ICONS.price[1]} label="Цена продажи" value={`¥${l.price_sell_cny} ≈ ${Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽`} />
+            <SpecBox Icon={SPEC_ICONS.color[0]} iconClass={SPEC_ICONS.color[1]} label={tt("Цвет")} value={tr('color', l.color)} />
+            <SpecBox Icon={SPEC_ICONS.touch[0]} iconClass={SPEC_ICONS.touch[1]} label={tt("Сенсор")} value={l.touch === 'yes' ? tt('Да') : tt('Нет')} />
+            <SpecBox Icon={SPEC_ICONS.stock[0]} iconClass={SPEC_ICONS.stock[1]} label={tt("На складе")} value={`${inStockCount} / ${l.serials.length}`} />
+            <SpecBox Icon={SPEC_ICONS.price[0]} iconClass={SPEC_ICONS.price[1]} label={tt("Цена продажи")} value={
+              <span className="flex items-center gap-2">
+                ¥{l.price_sell_cny} ≈ {Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽
+                <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
+              </span>
+            } />
             {(() => {
               const CostIcon = showCost ? SPEC_ICONS.cost[0] : EyeOff;
               return (
@@ -252,7 +259,7 @@ export default function LaptopDetail() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] text-text3 uppercase font-bold tracking-wide flex items-center gap-1">
-                      Себестоимость {showCost ? <EyeOff size={11} /> : <Eye size={11} />}
+                      {tt("Себестоимость")} {showCost ? <EyeOff size={11} /> : <Eye size={11} />}
                     </div>
                     <div className="font-bold text-sm truncate">{showCost ? `¥${l.cost_cny}` : '••••'}</div>
                   </div>
@@ -263,13 +270,42 @@ export default function LaptopDetail() {
         </div>
       )}
 
+      {l.price_history_full && l.price_history_full.length > 1 && (
+        <div className="card mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-bold text-sm flex items-center gap-2">
+              📊 {tt("История цены")} <PriceSparkline points={l.price_sparkline} trend={l.price_trend} width={80} height={28} />
+            </div>
+          </div>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {[...l.price_history_full].reverse().map((p, i, arr) => {
+              const prev = arr[i + 1];
+              const diff = prev ? Number(p.price_cny) - Number(prev.price_cny) : 0;
+              return (
+                <div key={i} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
+                  <span className="text-text3">{new Date(p.changed_at).toLocaleString('ru-RU')}</span>
+                  <span className="flex items-center gap-2">
+                    <b>¥{p.price_cny}</b>
+                    {diff !== 0 && (
+                      <span className={diff > 0 ? 'text-green text-xs' : 'text-red text-xs'}>
+                        {diff > 0 ? '↑' : '↓'} {Math.abs(diff)}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-          <div className="font-bold text-sm">Серийные номера ({l.serials.length})</div>
+          <div className="font-bold text-sm">{tt("Серийные номера")} ({l.serials.length})</div>
           {canEdit && (
             <div className={`flex gap-2 transition ${selected.length === 0 ? 'opacity-40 pointer-events-none' : ''}`}>
-              <button className="btn btn-primary btn-sm" onClick={sellSelected}>🛒 Продать выбранные ({selected.length})</button>
-              <button className="btn btn-secondary btn-sm" onClick={reserveSelected}>🔒 Зарезервировать</button>
+              <button className="btn btn-primary btn-sm" onClick={sellSelected}>🛒 {tt("Продать выбранные")} ({selected.length})</button>
+              <button className="btn btn-secondary btn-sm" onClick={reserveSelected}>🔒 {tt("Зарезервировать")}</button>
             </div>
           )}
         </div>
@@ -281,7 +317,7 @@ export default function LaptopDetail() {
                   {canEdit && availableSerials.length > 0 &&
                     <input type="checkbox" onChange={toggleAll} checked={selected.length > 0 && selected.length === availableSerials.length} />}
                 </th>
-                <th className="pb-2">Серийник</th><th className="pb-2">Статус</th><th className="pb-2">Поступление</th><th className="pb-2">Дней</th><th className="pb-2"></th>
+                <th className="pb-2">{tt("Серийник")}</th><th className="pb-2">{tt("Статус")}</th><th className="pb-2">{tt("Поступление")}</th><th className="pb-2">{tt("Дней")}</th><th className="pb-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -303,7 +339,7 @@ export default function LaptopDetail() {
                       )}
                     </td>
                     <td className="py-2 text-text3">{s.arrival_date ? new Date(s.arrival_date).toLocaleDateString('ru-RU') : '—'}</td>
-                    <td className="py-2 text-text3">{days !== null ? `${days}д` : '—'}</td>
+                    <td className="py-2 text-text3">{days !== null ? `${days}${tt('д')}` : '—'}</td>
                     <td className="py-2 text-right whitespace-nowrap">
                       <button className="text-text3 hover:text-accent2 text-xs mr-2" onClick={() => printSerialLabel({ serial: s.serial, brand: l.brand, series: l.series, specs: [l.cpu, l.ram, l.storage].filter(Boolean).join(' / '), arrivalDate: s.arrival_date })}>🏷️</button>
                       {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => deleteSerial(s.id)}>✕</button>}
@@ -311,7 +347,7 @@ export default function LaptopDetail() {
                   </tr>
                 );
               })}
-              {!l.serials.length && <tr><td colSpan={6} className="text-center py-6 text-text3">Нет серийников</td></tr>}
+              {!l.serials.length && <tr><td colSpan={6} className="text-center py-6 text-text3">{tt("Нет серийников")}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -319,15 +355,15 @@ export default function LaptopDetail() {
         {canEdit && (
           <>
             <form onSubmit={addOne} className="flex gap-2 mb-2">
-              <input className="inp" placeholder="Новый серийник" value={serial} onChange={e => setSerial(e.target.value)} />
-              <button type="button" className="btn btn-secondary" onClick={() => setShowCamera(true)} title="Сканировать камерой">📷</button>
+              <input className="inp" placeholder={tt("Новый серийник")} value={serial} onChange={e => setSerial(e.target.value)} />
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCamera(true)} title={tt("Сканировать камерой")}>📷</button>
               <button type="button" className="btn btn-secondary" onClick={genSerial}>BP</button>
               <button className="btn btn-primary px-4">+</button>
             </form>
-            <button className="btn btn-secondary btn-sm w-full justify-center" onClick={() => setShowBulk(s => !s)}>🏷️ Массовая загрузка серийников {showBulk ? '▲' : '▼'}</button>
+            <button className="btn btn-secondary btn-sm w-full justify-center" onClick={() => setShowBulk(s => !s)}>🏷️ {tt("Массовая загрузка серийников")} {showBulk ? '▲' : '▼'}</button>
             {showBulk && (
               <form onSubmit={addBulk} className="mt-2">
-                <textarea className="inp mb-2" rows={3} placeholder="По одному серийнику в строке" value={bulk} onChange={e => setBulk(e.target.value)} />
+                <textarea className="inp mb-2" rows={3} placeholder={tt("По одному серийнику в строке")} value={bulk} onChange={e => setBulk(e.target.value)} />
                 <button className="btn btn-secondary">{t('add')}</button>
               </form>
             )}

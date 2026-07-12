@@ -25,11 +25,18 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
         GROUP BY l.id
         HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) <= l.low_stock_threshold
       `),
-      // Должники — берём из реальной таблицы долгов, а не устаревшего поля clients.debt_rub
+      // Должники — берём из реальной таблицы долгов, а не устаревшего поля clients.debt_rub.
+      // Долги в юанях (amount_cny) пересчитываются по сегодняшнему курсу, а не по курсу на момент создания.
       pool.query(`
-        SELECT c.id, c.name, COALESCE(SUM(d.amount_rub - d.amount_paid_rub),0) AS debt_rub
+        SELECT c.id, c.name, COALESCE(SUM(
+          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+          ELSE (d.amount_rub - d.amount_paid_rub) END
+        ),0) AS debt_rub
         FROM clients c JOIN debts d ON d.client_id = c.id AND d.status='open'
-        GROUP BY c.id, c.name HAVING SUM(d.amount_rub - d.amount_paid_rub) > 0
+        GROUP BY c.id, c.name HAVING SUM(
+          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
+          ELSE (d.amount_rub - d.amount_paid_rub) END
+        ) > 0
         ORDER BY debt_rub DESC
       `),
       pool.query(`

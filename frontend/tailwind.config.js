@@ -7,11 +7,11 @@ export default {
         sans: ['Inter', '-apple-system', 'sans-serif'],
       },
       colors: {
-        bg: '#09090b', bg2: '#131316', bg3: '#1c1c1f', bg4: '#252529',
-        border: '#27272a',
+        bg: 'var(--bg)', bg2: 'var(--bg2)', bg3: 'var(--bg3)', bg4: 'var(--bg4)',
+        border: 'var(--border)',
         accent: '#e11d2e', accent2: '#ff5a63',
         green: '#22c55e', red: '#f43f5e', yellow: '#e8b84b', purple: '#c084fc',
-        text: '#f6f0ee', text2: '#a1a1aa', text3: '#71717a',
+        text: 'var(--text)', text2: 'var(--text2)', text3: 'var(--text3)',
       },
       borderRadius: {
         xl2: '1rem',
