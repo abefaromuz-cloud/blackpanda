@@ -314,14 +314,23 @@ function DangerZoneTab() {
   const [eConfirm, setEConfirm] = useState('');
   const [eBusy, setEBusy] = useState(false);
 
-  function load() { api.get('/admin-danger/code-status').then(r => setCodeSet(r.data.code_set)); }
+  const [loadError, setLoadError] = useState('');
+  function load() {
+    api.get('/admin-danger/code-status')
+      .then(r => setCodeSet(r.data.code_set))
+      .catch(err => { setLoadError(err.response?.data?.error || err.message || 'Не удалось загрузить'); setCodeSet(false); });
+  }
   useEffect(load, []);
 
   async function saveCode(e) {
     e.preventDefault();
     if (!newCode) return;
-    await api.post('/admin-danger/set-code', { code: newCode });
-    setNewCode(''); setMsg(tt('Код сохранён')); load();
+    try {
+      await api.post('/admin-danger/set-code', { code: newCode });
+      setNewCode(''); setMsg(tt('Код сохранён')); load();
+    } catch (err) {
+      setMsg(`❌ ${err.response?.data?.error || 'Ошибка сохранения'}`);
+    }
   }
 
   async function clearWarehouse(e) {
@@ -352,6 +361,7 @@ function DangerZoneTab() {
 
   return (
     <div className="space-y-5">
+      {loadError && <div className="card border border-red text-red text-sm">⚠️ {tt('Не удалось загрузить статус кода доступа')}: {loadError}</div>}
       <div className="card border border-red/30">
         <div className="text-red text-sm font-bold mb-2">⚠️ {tt('Эти действия необратимы. Пользоваться только если точно понимаешь, что делаешь.')}</div>
       </div>

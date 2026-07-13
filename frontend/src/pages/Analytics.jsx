@@ -18,6 +18,8 @@ export default function Analytics() {
   const [d, setD] = useState(null);
   const [rateData, setRateData] = useState([]);
   const [ratePeriod, setRatePeriod] = useState('month');
+  const [cbrRefreshing, setCbrRefreshing] = useState(false);
+  const [cbrMsg, setCbrMsg] = useState('');
   const [period, setPeriod] = useState('month');
   const { from, to } = periodToRange(period, '2024-01-01');
   const [insights, setInsights] = useState(null);
@@ -32,7 +34,7 @@ export default function Analytics() {
   }
   useEffect(load, [period]);
 
-  useEffect(() => {
+  function loadRateComparison() {
     const { from: rf } = periodToRange(ratePeriod, '2024-01-01');
     Promise.all([api.get('/settings/rate-history'), api.get('/settings/cbr-rate-history')]).then(([own, cbr]) => {
       const cutoff = new Date(rf).getTime();
@@ -50,7 +52,19 @@ export default function Analytics() {
         .map(p => ({ ...p, date: new Date(p.iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) }));
       setRateData(points);
     });
-  }, [ratePeriod]);
+  }
+  useEffect(loadRateComparison, [ratePeriod]);
+
+  async function refreshCbrRate() {
+    setCbrRefreshing(true); setCbrMsg('');
+    try {
+      const { data } = await api.post('/settings/cbr-rate/refresh');
+      setCbrMsg(`✅ ${tt('Курс ЦБ обновлён')}: ¥1 = ${data.rate} ₽`);
+      loadRateComparison();
+    } catch (e) {
+      setCbrMsg(`❌ ${e.response?.data?.error || tt('Не удалось обновить курс')}`);
+    } finally { setCbrRefreshing(false); }
+  }
 
   function money(obj) {
     if (!obj) return '—';
@@ -169,8 +183,14 @@ export default function Analytics() {
       <div className="card mb-4">
         <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
           <div className="font-bold text-sm">💱 {tt('Курс юаня: система vs ЦБ РФ')}</div>
-          <PeriodSelector value={ratePeriod} onChange={setRatePeriod} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <PeriodSelector value={ratePeriod} onChange={setRatePeriod} />
+            <button className="btn btn-secondary btn-xs" onClick={refreshCbrRate} disabled={cbrRefreshing}>
+              {cbrRefreshing ? tt('Обновляю...') : `🔄 ${tt('Обновить курс ЦБ')}`}
+            </button>
+          </div>
         </div>
+        {cbrMsg && <div className="text-xs text-accent2 mb-2">{cbrMsg}</div>}
         <div className="text-[10px] text-text3 mb-3">{tt('Курс ЦБ РФ обновляется автоматически на сервере несколько раз в день — заходить и нажимать ничего не нужно.')}</div>
         <ResponsiveContainer width="100%" height={180}>
           <LineChart data={rateData}>
@@ -185,7 +205,7 @@ export default function Analytics() {
         </ResponsiveContainer>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid lg:grid-cols-2 gap-4 mb-4">
         <div className="card">
           <div className="font-bold text-sm mb-3">{tt('Топ прибыльных моделей')}</div>
           {d.top_models.map((m, i) => (
@@ -195,17 +215,6 @@ export default function Analytics() {
             </div>
           ))}
           {!d.top_models.length && <div className="text-text3 text-sm">—</div>}
-        </div>
-
-        <div className="card">
-          <div className="font-bold text-sm mb-3">{tt('Эффективность менеджеров')}</div>
-          {d.by_manager.map(m => (
-            <div key={m.id} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
-              <span className="truncate">{m.full_name}</span>
-              <span className="text-right text-xs flex-shrink-0">{m.orders} {tt('шт.')} · <b className="text-text">{money(m.revenue)}</b></span>
-            </div>
-          ))}
-          {!d.by_manager.length && <div className="text-text3 text-sm">{tt('Нет данных за период')}</div>}
         </div>
 
         <div className="card">

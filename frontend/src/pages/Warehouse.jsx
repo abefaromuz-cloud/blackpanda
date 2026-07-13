@@ -390,7 +390,6 @@ export default function Warehouse() {
                     <td className="py-2"><span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span></td>
                     <td className="py-2">
                       <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
-                      <span className="text-text3 text-xs">/{l.total}</span>
                       {l.days_left_forecast !== null && inStock > 0 && (
                         <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
                           ~{l.days_left_forecast} {tt('дн. запаса')}
