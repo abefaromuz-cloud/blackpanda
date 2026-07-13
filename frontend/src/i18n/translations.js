@@ -58,7 +58,7 @@ export const translations = {
     ourDevice: 'Наш ноутбук', externalDevice: 'Внешнее устройство', deviceLabel: 'Марка/модель (со слов клиента)',
     warrantyCase: 'Гарантийный случай', repairCost: 'Стоимость ремонта ₽', technician: 'Мастер',
     inProgress: 'В ремонте', doneStatus: 'Готово', issued: 'Выдано', declined: 'Отказ',
-    newServiceOrder: '+ Заявка в сервис', checkSerial: 'Проверить по серийнику',
+    newServiceOrder: '+ Заявка в сервис', checkSerial: 'Проверить по серийнику', more: 'Ещё',
   },
   zh: {
     dashboard: '仪表盘', warehouse: '仓库', clients: '客户', preorders: '预订单',
@@ -119,7 +119,7 @@ export const translations = {
     ourDevice: '自有设备', externalDevice: '外部设备', deviceLabel: '品牌/型号（客户提供）',
     warrantyCase: '保修情形', repairCost: '维修费用 ₽', technician: '维修员',
     inProgress: '维修中', doneStatus: '已完成', issued: '已发还', declined: '拒绝',
-    newServiceOrder: '+ 维修工单', checkSerial: '按序列号查询',
+    newServiceOrder: '+ 维修工单', checkSerial: '按序列号查询', more: '更多',
   }
 };
 

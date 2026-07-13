@@ -74,6 +74,14 @@ export function exportToPdf({ title, subtitle, columns, rows, footerRow }) {
 
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+  <script>
+    function bpGoBack() {
+      if (window.opener || (window.history && window.history.length > 1)) {
+        try { window.close(); } catch (e) {}
+      }
+      setTimeout(function() { window.location.href = '/'; }, 50);
+    }
+  </script>
   <style>
     body{font-family:Arial,sans-serif;margin:0;color:#111}
     .banner{background:linear-gradient(120deg,#0d0d0f 60%,#1a0d0e 100%);color:#fff;padding:22px 28px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
@@ -109,6 +117,7 @@ export function exportToPdf({ title, subtitle, columns, rows, footerRow }) {
     <div class="sub">${subtitle ? subtitle + ' · ' : ''}${new Date().toLocaleString('ru-RU')} · ${CONTACT.site} · ${CONTACT.telegram} · ${CONTACT.team}</div>
     <table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}${footer}</tbody></table>
     <button class="no-print" onclick="window.print()">🖨️ Печать / Сохранить как PDF</button>
+    <button class="no-print" onclick="bpGoBack()" style="background:#27272a;color:#fff;border:none">← Назад в BlackPanda</button>
   </div>
   </body></html>`);
   w.document.close();

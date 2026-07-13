@@ -2,8 +2,10 @@ import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 // Маленький график без осей — просто линия тренда цены. trend: 'up' | 'down' | 'flat'
 export default function PriceSparkline({ points, trend, width = 60, height = 24 }) {
-  if (!points || points.length < 2) return null;
-  const data = points.map((v, i) => ({ i, v: Number(v) }));
+  if (!Array.isArray(points)) return null;
+  const clean = points.map(v => Number(v)).filter(v => Number.isFinite(v));
+  if (clean.length < 2) return null;
+  const data = clean.map((v, i) => ({ i, v }));
   const color = trend === 'up' ? '#22c55e' : trend === 'down' ? '#f43f5e' : '#71717a';
   const icon = trend === 'up' ? '📈' : trend === 'down' ? '📉' : '';
 

@@ -74,9 +74,26 @@ export default function Dashboard() {
           <Link to="/scan" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">🔍</span><div><div className="text-xs font-bold">{tt("Быстрый поиск")}</div><div className="text-[10px] text-text3">{tt("По серийному номеру")}</div></div></Link>
           <Link to="/warehouse" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">➕</span><div><div className="text-xs font-bold">{tt("Добавить устройство")}</div><div className="text-[10px] text-text3">{tt("Внести новый товар")}</div></div></Link>
           <Link to="/clients" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">👤</span><div><div className="text-xs font-bold">{tt("Добавить клиента")}</div><div className="text-[10px] text-text3">{tt("Новый клиент в базу")}</div></div></Link>
-          <Link to="/import" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">📥</span><div><div className="text-xs font-bold">{tt("Импорт")}</div><div className="text-[10px] text-text3">{tt("Загрузить список")}</div></div></Link>
         </div>
       )}
+
+      {/* Сколько моделей и сколько единиц товара сейчас в наличии на складе */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <Link to="/warehouse" className="card flex items-center gap-3 hover:border-accent/50">
+          <div className="w-10 h-10 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center flex-shrink-0 text-lg">🗂️</div>
+          <div>
+            <div className="text-2xl font-black">{d.stock.models_in_stock}</div>
+            <div className="text-[10px] text-text3 uppercase font-bold">{tt("Моделей в наличии")}</div>
+          </div>
+        </Link>
+        <Link to="/warehouse" className="card flex items-center gap-3 hover:border-accent/50">
+          <div className="w-10 h-10 rounded-lg bg-green/15 text-green flex items-center justify-center flex-shrink-0 text-lg">📦</div>
+          <div>
+            <div className="text-2xl font-black">{d.stock.in_stock}</div>
+            <div className="text-[10px] text-text3 uppercase font-bold">{tt("Товара на складе")}</div>
+          </div>
+        </Link>
+      </div>
 
       {/* Задачи + напоминания по должникам */}
       <div className="grid md:grid-cols-3 gap-4 mb-5">

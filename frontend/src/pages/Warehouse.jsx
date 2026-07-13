@@ -30,7 +30,7 @@ export default function Warehouse() {
   const [sort, setSort] = useState({ col: 'brand', dir: 1 });
   const { can } = useAuth();
   const { badgeClass } = useStatuses();
-  const { tr } = useLibraryText();
+  const { lib, tr } = useLibraryText();
   const tt = useTT();
   const { t } = useLang();
   const canEdit = can('warehouse', 'edit');

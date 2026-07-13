@@ -14,16 +14,18 @@ const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preo
 export default function Admin() {
   const { t, lang } = useLang();
   const [tab, setTab] = useState('users');
+  const tt = useTT();
 
   return (
     <div>
       <h1 className="text-2xl font-black mb-6 flex items-center gap-2"><span className="text-purple">◇</span> {t('admin')}</h1>
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap">
         <button onClick={() => setTab('users')} className={`btn ${tab === 'users' ? 'btn-primary' : 'btn-secondary'}`}>{t('users')}</button>
         <button onClick={() => setTab('permissions')} className={`btn ${tab === 'permissions' ? 'btn-primary' : 'btn-secondary'}`}>{t('permissions')}</button>
         <button onClick={() => setTab('navorder')} className={`btn ${tab === 'navorder' ? 'btn-primary' : 'btn-secondary'}`}>{t('menuOrder')}</button>
+        <button onClick={() => setTab('danger')} className={`btn ${tab === 'danger' ? 'btn-danger' : 'btn-secondary'}`}>⚠️ {tt('Опасная зона')}</button>
       </div>
-      {tab === 'users' ? <UsersTab /> : tab === 'permissions' ? <PermissionsTab /> : <NavOrderTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'permissions' ? <PermissionsTab /> : tab === 'navorder' ? <NavOrderTab /> : <DangerZoneTab />}
     </div>
   );
 }
@@ -291,6 +293,101 @@ function PermissionsTab() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+function DangerZoneTab() {
+  const tt = useTT();
+  const [codeSet, setCodeSet] = useState(null);
+  const [newCode, setNewCode] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const [wCode, setWCode] = useState('');
+  const [wFrom, setWFrom] = useState('');
+  const [wTo, setWTo] = useState('');
+  const [wConfirm, setWConfirm] = useState('');
+  const [wResult, setWResult] = useState(null);
+  const [wBusy, setWBusy] = useState(false);
+
+  const [eCode, setECode] = useState('');
+  const [eConfirm, setEConfirm] = useState('');
+  const [eBusy, setEBusy] = useState(false);
+
+  function load() { api.get('/admin-danger/code-status').then(r => setCodeSet(r.data.code_set)); }
+  useEffect(load, []);
+
+  async function saveCode(e) {
+    e.preventDefault();
+    if (!newCode) return;
+    await api.post('/admin-danger/set-code', { code: newCode });
+    setNewCode(''); setMsg(tt('Код сохранён')); load();
+  }
+
+  async function clearWarehouse(e) {
+    e.preventDefault();
+    if (wConfirm !== 'УДАЛИТЬ СКЛАД') { alert(tt('Введи текст подтверждения ровно как указано')); return; }
+    setWBusy(true); setWResult(null);
+    try {
+      const { data } = await api.post('/admin-danger/clear-warehouse', { code: wCode, from: wFrom || undefined, to: wTo || undefined });
+      setWResult(data);
+      setWCode(''); setWConfirm('');
+    } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); }
+    finally { setWBusy(false); }
+  }
+
+  async function clearEverything(e) {
+    e.preventDefault();
+    if (eConfirm !== 'УДАЛИТЬ ВСЁ') { alert(tt('Введи текст подтверждения ровно как указано')); return; }
+    setEBusy(true);
+    try {
+      await api.post('/admin-danger/clear-everything', { code: eCode });
+      alert('✅ ' + tt('Система полностью очищена'));
+      setECode(''); setEConfirm('');
+    } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); }
+    finally { setEBusy(false); }
+  }
+
+  if (codeSet === null) return <div className="text-text3">Загрузка...</div>;
+
+  return (
+    <div className="space-y-5">
+      <div className="card border border-red/30">
+        <div className="text-red text-sm font-bold mb-2">⚠️ {tt('Эти действия необратимы. Пользоваться только если точно понимаешь, что делаешь.')}</div>
+      </div>
+
+      <form onSubmit={saveCode} className="card">
+        <div className="font-bold text-sm mb-1">🔑 {tt('Код доступа к опасным операциям')}</div>
+        <div className="text-xs text-text3 mb-3">
+          {codeSet ? tt('Код уже установлен. Ты можешь сменить его ниже.') : tt('Код ещё не установлен — задай его, прежде чем сможешь что-либо очищать.')}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <input className="inp max-w-xs" type="password" placeholder={tt('Новый код (минимум 4 символа)')} value={newCode} onChange={e => setNewCode(e.target.value)} />
+          <button className="btn btn-primary">{tt('Сохранить код')}</button>
+        </div>
+        {msg && <div className="text-green text-xs mt-2">{msg}</div>}
+      </form>
+
+      <form onSubmit={clearWarehouse} className="card border border-yellow/30">
+        <div className="font-bold text-sm mb-1">📦 {tt('Очистить склад')}</div>
+        <div className="text-xs text-text3 mb-3">{tt('Удаляет модели, серийники и связанные с ними продажи/предзаказы. Можно указать диапазон дат добавления модели — тогда удалятся только модели, добавленные в этот период.')}</div>
+        <div className="grid grid-cols-2 gap-2 mb-3 max-w-md">
+          <div><label className="block text-[11px] text-text2 mb-1">{tt('С даты (необязательно)')}</label><input className="inp" type="date" value={wFrom} onChange={e => setWFrom(e.target.value)} /></div>
+          <div><label className="block text-[11px] text-text2 mb-1">{tt('По дату (необязательно)')}</label><input className="inp" type="date" value={wTo} onChange={e => setWTo(e.target.value)} /></div>
+        </div>
+        <input className="inp mb-2 max-w-xs" type="password" placeholder={tt('Код доступа')} value={wCode} onChange={e => setWCode(e.target.value)} />
+        <input className="inp mb-3 max-w-xs" placeholder={tt('Введи: УДАЛИТЬ СКЛАД')} value={wConfirm} onChange={e => setWConfirm(e.target.value)} />
+        <button className="btn btn-danger" disabled={wBusy}>{wBusy ? tt('Удаляю...') : `🗑️ ${tt('Очистить склад')}`}</button>
+        {wResult && <div className="text-xs text-text3 mt-2">{tt('Удалено моделей')}: {wResult.deleted_models}, {tt('серийников')}: {wResult.deleted_serials}</div>}
+      </form>
+
+      <form onSubmit={clearEverything} className="card border border-red/50">
+        <div className="font-bold text-sm mb-1 text-red">💣 {tt('Полная очистка системы')}</div>
+        <div className="text-xs text-text3 mb-3">{tt('Удаляет ВСЁ: клиентов, склад, продажи, предзаказы, кассу, долги, сервис, рассылки. Пользователи, права доступа и Справочник остаются.')}</div>
+        <input className="inp mb-2 max-w-xs" type="password" placeholder={tt('Код доступа')} value={eCode} onChange={e => setECode(e.target.value)} />
+        <input className="inp mb-3 max-w-xs" placeholder={tt('Введи: УДАЛИТЬ ВСЁ')} value={eConfirm} onChange={e => setEConfirm(e.target.value)} />
+        <button className="btn btn-danger" disabled={eBusy}>{eBusy ? tt('Удаляю...') : `💣 ${tt('Очистить всю систему')}`}</button>
+      </form>
     </div>
   );
 }

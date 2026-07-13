@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import api from '../api/client';
 import { useTT } from '../i18n/useTT';
@@ -51,6 +51,52 @@ function LegacyImportBlock({ canEdit }) {
           {tt("продаж")} — {result.sales}, {tt("записей кассы")} — {result.cash}, {tt("долгов")} — {result.debts}
         </div>
       )}
+    </div>
+  );
+}
+
+function ImportBatchesBlock({ canEdit }) {
+  const tt = useTT();
+  const [batches, setBatches] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  function load() { api.get('/import/batches').then(r => setBatches(r.data)); }
+  useEffect(load, []);
+
+  async function removeBatch(b) {
+    const c = b.counts || {};
+    if (!confirm(`${tt('Удалить эту партию импорта?')}\n${new Date(b.imported_at).toLocaleString('ru-RU')}\n${tt('Модели')}: ${c.laptops || 0}, ${tt('клиенты')}: ${c.clients || 0}, ${tt('продажи')}: ${c.sales || 0}\n\n${tt('Клиенты удалятся, только если с тех пор у них не появилось реальных продаж/долгов.')}`)) return;
+    setBusyId(b.id);
+    try {
+      await api.delete(`/import/batches/${b.id}`);
+      load();
+    } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); }
+    finally { setBusyId(null); }
+  }
+
+  if (!batches || !batches.length) return null;
+
+  return (
+    <div className="card mb-5">
+      <div className="font-bold text-sm mb-3">📜 {tt("История импортов")}</div>
+      <div className="space-y-2">
+        {batches.map(b => {
+          const c = b.counts || {};
+          return (
+            <div key={b.id} className="flex justify-between items-center flex-wrap gap-2 py-2 border-b border-border last:border-0 text-sm">
+              <div>
+                <div>{new Date(b.imported_at).toLocaleString('ru-RU')} {b.imported_by_name && <span className="text-text3">· {b.imported_by_name}</span>}</div>
+                <div className="text-xs text-text3">{tt('Модели')}: {c.laptops || 0} · {tt('клиенты')}: {c.clients || 0} · {tt('серийники')}: {c.serials || 0} · {tt('продажи')}: {c.sales || 0}</div>
+              </div>
+              {canEdit && (
+                <button className="btn btn-danger btn-sm" onClick={() => removeBatch(b)} disabled={busyId === b.id}>
+                  {busyId === b.id ? tt('Удаляю...') : `🗑️ ${tt('Удалить эту партию')}`}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -124,6 +170,7 @@ export default function Import() {
         <button className="btn btn-secondary" onClick={downloadBackup}>⬇️ {tt('Скачать бэкап')}</button>
       </div>
       <LegacyImportBlock canEdit={canEdit} />
+      <ImportBatchesBlock canEdit={canEdit} />
       <ImportBlock
         title={t('importClients')}
         columns={['name', 'phone', 'telegram']}

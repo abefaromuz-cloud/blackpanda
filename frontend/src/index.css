@@ -18,6 +18,13 @@ html.light {
 body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; }
 h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
 
+/* Безопасные зоны — вырез экрана сверху и полоса-индикатор Home снизу — актуально
+   только когда сайт открыт как установленное PWA-приложение (без обвязки Safari) */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Важно: обёрнуто в @layer components, чтобы Tailwind-утилиты (flex-1, w-24 и т.д.),
    написанные рядом в className, всегда побеждали в каскаде наши кастомные классы.
    Без этого слоя .inp (объявленный обычным CSS-классом после @tailwind utilities)
@@ -31,6 +38,9 @@ h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
   .btn-secondary { @apply bg-bg3 border border-border text-text2 hover:text-text hover:border-accent/50; }
   .btn-danger { @apply bg-red/10 border border-red/40 text-red hover:bg-red hover:text-white; }
   .inp { @apply w-full px-2.5 py-1.5 bg-bg3 border border-border rounded-lg text-text text-sm focus:border-accent focus:ring-1 focus:ring-accent/30 outline-none transition; }
+  /* iOS Safari игнорирует заданную ширину у нативного календаря (input type="date") при длинной
+     локализованной дате ("12 июля 2026 г.") — из-за этого поле вылезало за рамку карточки. */
+  input[type="date"].inp { -webkit-appearance: none; appearance: none; min-width: 0; }
   .inp-sm { @apply px-2 py-1 text-xs; }
   .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold; }
   .badge-blue { @apply bg-accent/15 text-accent2; }

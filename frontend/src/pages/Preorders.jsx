@@ -47,6 +47,12 @@ export default function Preorders() {
   const grandTotalCny = items.reduce((s, it) => s + unitPriceCny(it) * (Number(it.qty) || 1), 0);
   const requiredDepositCny = grandTotalCny * prepaymentPct / 100;
 
+  async function removePreorder(id) {
+    if (!confirm(tt('Удалить этот отменённый предзаказ насовсем?'))) return;
+    await api.delete(`/preorders/${id}`);
+    load();
+  }
+
   async function submit(e) {
     e.preventDefault();
     await api.post('/preorders', { client_id: clientId, prepayment_pct: prepaymentPct, items });
@@ -136,16 +142,23 @@ export default function Preorders() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {list.map(p => (
-          <Link key={p.id} to={`/preorders/${p.id}`} className="card hover:border-accent/60 hover:shadow-glow block">
-            <div className="flex justify-between items-start mb-2">
-              <span className="font-bold">{p.client_name}</span>
-              <span className={`badge ${p.stage === 'done' ? 'badge-green' : p.stage === 'cancelled' ? 'badge-red' : 'badge-yellow'}`}>
-                {p.stage === 'done' ? t('done') : p.stage === 'cancelled' ? tt('Отменён') : t('active')}
-              </span>
-            </div>
-            <div className="text-xs text-text3">No.{p.id.slice(-6)} · {p.items.length} {tt('поз.')}</div>
-            <div className="text-xs text-text3 mt-1">¥{Number(p.total_cny).toLocaleString('ru-RU')} · {tt('оплачено')} ¥{Number(p.paid_cny).toLocaleString('ru-RU')}</div>
-          </Link>
+          <div key={p.id} className={`card hover:border-accent/60 hover:shadow-glow relative border-l-4 ${
+            p.stage === 'done' ? 'border-l-green' : p.stage === 'cancelled' ? 'border-l-red' : 'border-l-yellow'
+          }`}>
+            <Link to={`/preorders/${p.id}`} className="block">
+              <div className="flex justify-between items-start mb-2">
+                <span className="font-bold">{p.client_name}</span>
+                <span className={`badge ${p.stage === 'done' ? 'badge-green' : p.stage === 'cancelled' ? 'badge-red' : 'badge-yellow'}`}>
+                  {p.stage === 'done' ? t('done') : p.stage === 'cancelled' ? tt('Отменён') : `🟡 ${t('active')}`}
+                </span>
+              </div>
+              <div className="text-xs text-text3">No.{p.id.slice(-6)} · {p.items.length} {tt('поз.')}</div>
+              <div className="text-xs text-text3 mt-1">¥{Number(p.total_cny).toLocaleString('ru-RU')} · {tt('оплачено')} ¥{Number(p.paid_cny).toLocaleString('ru-RU')}</div>
+            </Link>
+            {p.stage === 'cancelled' && canEdit && (
+              <button onClick={() => removePreorder(p.id)} className="text-red text-xs hover:underline mt-2">🗑️ {tt('Удалить')}</button>
+            )}
+          </div>
         ))}
         {!list.length && <div className="text-text3 text-sm">—</div>}
       </div>

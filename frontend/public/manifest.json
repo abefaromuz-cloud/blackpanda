@@ -1,0 +1,14 @@
+{
+  "name": "BlackPanda CRM",
+  "short_name": "BlackPanda",
+  "description": "CRM для перепродажи ноутбуков",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    { "src": "/panda-logo-icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/panda-logo-icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,3 +1,16 @@
+// Кнопка "Назад", которая работает и как настоящая новая вкладка (закрывает её),
+// и в полноэкранном PWA-режиме на мобильном, где window.open() иногда подменяет текущий
+// экран вместо открытия отдельной вкладки — тогда просто возвращаемся в приложение.
+const BACK_BUTTON_SCRIPT = `
+  function bpGoBack() {
+    if (window.opener || (window.history && window.history.length > 1)) {
+      try { window.close(); } catch (e) {}
+    }
+    setTimeout(function() { window.location.href = '/'; }, 50);
+  }
+`;
+const BACK_BUTTON_HTML = `<button class="no-print" onclick="bpGoBack()" style="margin-top:16px;margin-right:8px;padding:10px 20px;font-size:14px;cursor:pointer;background:#27272a;color:#fff;border:none;border-radius:8px">← Назад в BlackPanda</button>`;
+
 // Открывает окно печати с чеком продажи
 export function printReceipt({ saleId, clientName, items, discountRub, totalRub, totalCny, note }) {
   const rows = items.map(it => `<tr>
@@ -8,6 +21,7 @@ export function printReceipt({ saleId, clientName, items, discountRub, totalRub,
   </tr>`).join('');
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Заказ ${saleId || ''}</title>
+  <script>${BACK_BUTTON_SCRIPT}</script>
   <style>body{font-family:Arial;padding:24px;max-width:700px;margin:0 auto}
   h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal}
   table{width:100%;border-collapse:collapse;margin-top:16px}
@@ -21,7 +35,10 @@ export function printReceipt({ saleId, clientName, items, discountRub, totalRub,
   ${discountRub > 0 ? `<div style="text-align:right;margin-top:8px;color:#c00">Скидка: −${discountRub.toLocaleString('ru-RU')} ₽</div>` : ''}
   <div class="total">Итого: ${Math.round(totalRub).toLocaleString('ru-RU')} ₽ (¥${Number(totalCny).toFixed(0)})</div>
   ${note ? `<p>Комментарий: ${note}</p>` : ''}
-  <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">🖨️ Печать / PDF</button>
+  <div>
+    <button class="no-print" onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:14px;cursor:pointer">🖨️ Печать / PDF</button>
+    ${BACK_BUTTON_HTML}
+  </div>
   </body></html>`);
   w.document.close();
 }
@@ -31,6 +48,7 @@ export function printSerialLabel({ serial, brand, series, specs, arrivalDate }) 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(serial)}`;
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Этикетка ${serial}</title>
+  <script>${BACK_BUTTON_SCRIPT}</script>
   <style>body{font-family:Arial;padding:20px;max-width:300px}
   .label{border:2px solid #000;padding:12px;border-radius:8px;text-align:center}
   .brand{font-size:14px;font-weight:bold;margin-bottom:4px}
@@ -38,7 +56,7 @@ export function printSerialLabel({ serial, brand, series, specs, arrivalDate }) 
   .sn{font-size:16px;font-weight:900;font-family:monospace;margin:8px 0}
   .specs{font-size:10px;color:#444;margin-bottom:8px}
   img{margin:8px auto;display:block}
-  @media print{body{padding:5px}}</style></head>
+  @media print{body{padding:5px} .no-print{display:none}}</style></head>
   <body><div class="label">
     <div class="brand">${brand || 'BlackPanda'}</div>
     <div class="series">${series || ''}</div>
@@ -47,6 +65,7 @@ export function printSerialLabel({ serial, brand, series, specs, arrivalDate }) 
     <div class="sn">${serial}</div>
     <div style="font-size:10px;color:#888">BlackPanda CRM · ${arrivalDate ? new Date(arrivalDate).toLocaleDateString('ru-RU') : ''}</div>
   </div>
+  <div class="no-print" style="text-align:center">${BACK_BUTTON_HTML}</div>
   <script>window.onload=function(){window.print();}</script></body></html>`);
   w.document.close();
 }

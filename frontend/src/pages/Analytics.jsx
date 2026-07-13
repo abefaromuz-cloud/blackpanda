@@ -16,6 +16,8 @@ const PAYMENT_LABEL = { cash: 'Наличные', sber: 'Сбербанк', alfa
 
 export default function Analytics() {
   const [d, setD] = useState(null);
+  const [rateData, setRateData] = useState([]);
+  const [ratePeriod, setRatePeriod] = useState('month');
   const [period, setPeriod] = useState('month');
   const { from, to } = periodToRange(period, '2024-01-01');
   const [insights, setInsights] = useState(null);
@@ -29,6 +31,26 @@ export default function Analytics() {
     api.get('/analytics/full', { params: { from, to } }).then(r => setD(r.data));
   }
   useEffect(load, [period]);
+
+  useEffect(() => {
+    const { from: rf } = periodToRange(ratePeriod, '2024-01-01');
+    Promise.all([api.get('/settings/rate-history'), api.get('/settings/cbr-rate-history')]).then(([own, cbr]) => {
+      const cutoff = new Date(rf).getTime();
+      const byDate = {};
+      own.data.filter(r => new Date(r.created_at).getTime() >= cutoff).forEach(r => {
+        const iso = new Date(r.created_at).toISOString().slice(0, 10);
+        byDate[iso] = { ...byDate[iso], iso, own: Number(r.rate) };
+      });
+      cbr.data.filter(r => new Date(r.date).getTime() >= cutoff).forEach(r => {
+        const iso = new Date(r.date).toISOString().slice(0, 10);
+        byDate[iso] = { ...byDate[iso], iso, cbr: Number(r.rate) };
+      });
+      const points = Object.values(byDate)
+        .sort((a, b) => a.iso.localeCompare(b.iso))
+        .map(p => ({ ...p, date: new Date(p.iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) }));
+      setRateData(points);
+    });
+  }, [ratePeriod]);
 
   function money(obj) {
     if (!obj) return '—';
@@ -48,7 +70,7 @@ export default function Analytics() {
       });
       setInsights(data.insights);
     } catch (e) {
-      setInsights([tt('Не удалось получить инсайты — проверь ключ ИИ в Настройках')]);
+      setInsights([`❌ ${e.response?.data?.error || tt('Не удалось получить инсайты — проверь ключ ИИ в Настройках')}`]);
     } finally { setInsightsLoading(false); }
   }
 
@@ -142,6 +164,25 @@ export default function Analytics() {
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="card mb-4">
+        <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+          <div className="font-bold text-sm">💱 {tt('Курс юаня: система vs ЦБ РФ')}</div>
+          <PeriodSelector value={ratePeriod} onChange={setRatePeriod} />
+        </div>
+        <div className="text-[10px] text-text3 mb-3">{tt('Курс ЦБ РФ обновляется автоматически на сервере несколько раз в день — заходить и нажимать ничего не нужно.')}</div>
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={rateData}>
+            <CartesianGrid stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="date" stroke="var(--text3)" fontSize={11} />
+            <YAxis stroke="var(--text3)" fontSize={11} domain={['auto', 'auto']} />
+            <Tooltip contentStyle={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Line type="monotone" dataKey="own" name={tt('Курс системы')} stroke="#e11d2e" strokeWidth={2} dot={false} connectNulls />
+            <Line type="monotone" dataKey="cbr" name={tt('Курс ЦБ РФ')} stroke="#4f8cff" strokeWidth={2} dot={false} connectNulls />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-4">

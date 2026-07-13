@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, ScanLine, Warehouse, PackagePlus, Library, Users,
   ClipboardList, ShoppingCart, Wrench, Wallet, BarChart3, FileText,
-  Megaphone, Upload, History, Settings, ShieldCheck, Menu, X,
+  Megaphone, Upload, History, Settings, ShieldCheck, Menu, X, MoreHorizontal,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
@@ -28,6 +28,14 @@ const navItems = [
   { to: '/import',    key: 'importPage',page: 'import',    Icon: Upload },
   { to: '/activity-log', key: 'activityLog', page: 'activity_log', Icon: History },
   { to: '/settings',  key: 'settings',  page: 'settings',  Icon: Settings },
+];
+
+// Нижняя навигация на мобильном (как в старой версии системы) — 4 самых частых раздела + "Ещё"
+const BOTTOM_NAV = [
+  { to: '/',          key: 'dashboard', page: 'dashboard', Icon: LayoutDashboard, end: true },
+  { to: '/scan',      key: 'scan',      page: 'scan',      Icon: ScanLine },
+  { to: '/warehouse', key: 'warehouse', page: 'warehouse', Icon: Warehouse },
+  { to: '/clients',   key: 'clients',   page: 'clients',   Icon: Users },
 ];
 
 export default function Layout() {
@@ -63,7 +71,8 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen bg-bg">
       {/* Мобильная верхняя панель — видна только на маленьких экранах */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-bg2 border-b border-border flex items-center gap-3 px-4 py-3">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-bg2 border-b border-border flex items-center gap-3 px-4 py-3"
+        style={{ paddingTop: 'calc(0.75rem + var(--safe-top))' }}>
         <button onClick={() => setMobileOpen(true)} className="text-text2 hover:text-text">
           <Menu size={22} />
         </button>
@@ -149,10 +158,26 @@ export default function Layout() {
       </aside>
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
-        <div className="flex-1 p-4 lg:p-6 pt-20 lg:pt-6 overflow-y-auto">
+        <div className="flex-1 p-4 lg:p-6 pt-20 lg:pt-6 pb-20 lg:pb-6 overflow-y-auto">
           <Outlet />
         </div>
       </main>
+
+      {/* Нижняя навигация — только на мобильном, как в старой версии системы */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-bg2 border-t border-border flex items-stretch"
+        style={{ paddingBottom: 'var(--safe-bottom)' }}>
+        {BOTTOM_NAV.filter(i => can(i.page, 'view')).map(item => (
+          <NavLink key={item.to} to={item.to} end={item.end}
+            className={({ isActive }) => `flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] ${isActive ? 'text-accent2' : 'text-text3'}`}>
+            <item.Icon size={20} />
+            <span>{t(item.key)}</span>
+          </NavLink>
+        ))}
+        <button onClick={() => setMobileOpen(true)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] text-text3">
+          <MoreHorizontal size={20} />
+          <span>{t('more')}</span>
+        </button>
+      </nav>
     </div>
   );
 }

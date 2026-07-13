@@ -41,6 +41,11 @@ export default function LaptopDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [l, setL] = useState(null);
+  const [showMerge, setShowMerge] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeTarget, setMergeTarget] = useState(null);
+  const [mergeCandidates, setMergeCandidates] = useState([]);
+  const [merging, setMerging] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
   const [serial, setSerial] = useState('');
   const [bulk, setBulk] = useState('');
@@ -57,9 +62,36 @@ export default function LaptopDetail() {
   const { lib, tr } = useLibraryText();
   const canEdit = can('warehouse', 'edit');
 
-  function load() { api.get(`/laptops/${id}`).then(r => { setL(r.data); setActiveImg(0); }); }
+  const [loadError, setLoadError] = useState(null);
+  function load() {
+    setLoadError(null);
+    api.get(`/laptops/${id}`).then(r => { setL(r.data); setActiveImg(0); })
+      .catch(err => setLoadError(err.response?.data?.error || 'Не удалось загрузить карточку товара'));
+  }
   useEffect(load, [id]);
   useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
+
+  useEffect(() => {
+    if (!showMerge) return;
+    api.get('/laptops').then(r => setMergeCandidates(r.data.filter(x => x.id !== id)));
+  }, [showMerge, id]);
+
+  const mergeResults = mergeSearch.trim().length >= 2
+    ? mergeCandidates.filter(x => `${x.brand} ${x.series} ${x.cpu||''} ${x.ram||''}`.toLowerCase().includes(mergeSearch.toLowerCase())).slice(0, 8)
+    : [];
+
+  async function confirmMerge() {
+    if (!mergeTarget) return;
+    if (!confirm(`Перенести все серийники и историю с «${l.brand} ${l.series||''}» на «${mergeTarget.brand} ${mergeTarget.series||''}» и удалить эту карточку?`)) return;
+    setMerging(true);
+    try {
+      await api.post('/laptops/merge', { keep_id: mergeTarget.id, remove_id: id });
+      navigate(`/warehouse/${mergeTarget.id}`);
+    } catch (e2) {
+      alert(e2.response?.data?.error || 'Ошибка объединения');
+      setMerging(false);
+    }
+  }
 
   async function addOne(e) {
     e.preventDefault();
@@ -142,6 +174,7 @@ export default function LaptopDetail() {
     setEditing(false); load();
   }
 
+  if (loadError) return <div className="text-red">{loadError} <Link to="/warehouse" className="text-accent2 underline">← {t('warehouse')}</Link></div>;
   if (!l) return <div className="text-text3">{t('loading')}</div>;
 
   const images = (l.images && l.images.length ? l.images : (l.image_url ? [l.image_url] : []));
@@ -165,8 +198,36 @@ export default function LaptopDetail() {
           <span className="badge badge-blue font-mono">{l.item_code || '—'}</span>
           {l.mfr_item_code && <span className="badge badge-purple font-mono">ITEM: {l.mfr_item_code}</span>}
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
+          {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMerge(s => !s)}>🔗 {tt("Объединить дубль")}</button>}
         </div>
       </div>
+
+      {showMerge && (
+        <div className="card mb-5">
+          <div className="font-bold text-sm mb-1">🔗 {tt("Объединить с другой моделью")}</div>
+          <div className="text-xs text-text3 mb-3">{tt("Если это дубль (та же модель, но заведена второй раз, например с китайским названием) — найди оригинал, все серийники и история перенесутся туда, а эта карточка удалится.")}</div>
+          <input className="inp mb-2" placeholder={tt("Начни вводить бренд/серию оригинала...")} value={mergeSearch} onChange={e => { setMergeSearch(e.target.value); setMergeTarget(null); }} />
+          {mergeResults.length > 0 && !mergeTarget && (
+            <div className="bg-bg3 rounded-xl p-1 mb-2 max-h-48 overflow-y-auto">
+              {mergeResults.map(x => (
+                <button key={x.id} onClick={() => { setMergeTarget(x); setMergeSearch(`${x.brand} ${x.series || ''}`); }}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg4 text-sm flex justify-between">
+                  <span>{x.brand} {x.series}</span>
+                  <span className="text-text3 text-xs">{x.cpu} · {x.ram} · {x.in_stock} {tt('шт.')}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {mergeTarget && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <button className="btn btn-danger btn-sm" onClick={confirmMerge} disabled={merging}>
+                {merging ? tt('Объединяю...') : `✅ ${tt('Перенести всё на')} «${mergeTarget.brand} ${mergeTarget.series || ''}»`}
+              </button>
+              <button className="text-text3 text-xs hover:text-text" onClick={() => { setMergeTarget(null); setMergeSearch(''); }}>{t('cancel')}</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap mb-5">
         <span className={`badge ${inStockCount > 0 ? 'badge-green' : 'badge-red'}`}>📦 {overallStatus}</span>
@@ -270,7 +331,7 @@ export default function LaptopDetail() {
         </div>
       )}
 
-      {l.price_history_full && l.price_history_full.length > 1 && (
+      {Array.isArray(l.price_history_full) && l.price_history_full.length > 1 && (
         <div className="card mb-5">
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-sm flex items-center gap-2">
@@ -282,11 +343,11 @@ export default function LaptopDetail() {
               const prev = arr[i + 1];
               const diff = prev ? Number(p.price_cny) - Number(prev.price_cny) : 0;
               return (
-                <div key={i} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
-                  <span className="text-text3">{new Date(p.changed_at).toLocaleString('ru-RU')}</span>
+                <div key={p.changed_at || i} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
+                  <span className="text-text3">{p.changed_at ? new Date(p.changed_at).toLocaleString('ru-RU') : '—'}</span>
                   <span className="flex items-center gap-2">
                     <b>¥{p.price_cny}</b>
-                    {diff !== 0 && (
+                    {Number.isFinite(diff) && diff !== 0 && (
                       <span className={diff > 0 ? 'text-green text-xs' : 'text-red text-xs'}>
                         {diff > 0 ? '↑' : '↓'} {Math.abs(diff)}
                       </span>
