@@ -145,6 +145,16 @@ router.post('/:id/cancel', authenticate, requirePermission('preorders', 'edit'),
   res.json({ success: true });
 });
 
+// Удалить предзаказ — разрешено только для уже отменённых, чтобы случайно не стереть
+// реальную историю активных или выполненных заказов
+router.delete('/:id', authenticate, requirePermission('preorders', 'edit'), async (req, res) => {
+  const p = await pool.query('SELECT stage FROM preorders WHERE id=$1', [req.params.id]);
+  if (!p.rows[0]) return res.status(404).json({ error: 'Предзаказ не найден' });
+  if (p.rows[0].stage !== 'cancelled') return res.status(400).json({ error: 'Удалять можно только отменённые предзаказы' });
+  await pool.query('DELETE FROM preorders WHERE id=$1', [req.params.id]); // preorder_items уйдут каскадом
+  res.json({ success: true });
+});
+
 // Передача товара клиенту по предзаказу: списывает серийники со склада, создаёт продажу,
 // закрывает остаток ДОЛГА В ЮАНЯХ по курсу на момент передачи (а не по курсу заказа),
 // шлёт уведомление в Telegram

@@ -20,6 +20,7 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
   const clientIdMap = {}, laptopIdMap = {}, serialIdMap = {}, saleIdMap = {};
   const counts = { clients: 0, laptops: 0, serials: 0, sales: 0, cash: 0, debts: 0 };
   let placeholderClientId = null;
+  const batchId = require('crypto').randomUUID(); // метка этой конкретной загрузки — по ней можно будет удалить именно её
 
   // Продажа в новой системе обязательно привязана к клиенту. Если в старом бэкапе у продажи
   // клиент не указан или ссылается на уже несуществующего/удалённого клиента — вместо падения
@@ -30,7 +31,8 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
     const existing = await client.query(`SELECT id FROM clients WHERE name='Без клиента (импорт)' LIMIT 1`);
     if (existing.rows[0]) { placeholderClientId = existing.rows[0].id; return placeholderClientId; }
     const created = await client.query(
-      `INSERT INTO clients (name, notes) VALUES ('Без клиента (импорт)', 'Создан автоматически при импорте — продажи без указанного клиента в старой системе') RETURNING id`
+      `INSERT INTO clients (name, notes, import_batch_id) VALUES ('Без клиента (импорт)', 'Создан автоматически при импорте — продажи без указанного клиента в старой системе', $1) RETURNING id`,
+      [batchId]
     );
     placeholderClientId = created.rows[0].id;
     return placeholderClientId;
@@ -42,8 +44,8 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
     // 1. Клиенты
     for (const c of (data.clients || [])) {
       const r = await client.query(
-        `INSERT INTO clients (name, phone, telegram, balance_rub, notes) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [c.name || 'Без имени', c.phone || null, c.telegram || null, c.balance || 0, c.info || null]
+        `INSERT INTO clients (name, phone, telegram, balance_rub, notes, import_batch_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [c.name || 'Без имени', c.phone || null, c.telegram || null, c.balance || 0, c.info || null, batchId]
       );
       clientIdMap[c.id] = r.rows[0].id;
       counts.clients++;
@@ -53,10 +55,10 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
     for (const l of (data.laptops || [])) {
       const images = (l.images && l.images.length) ? l.images : (l.image ? [l.image] : []);
       const r = await client.query(
-        `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,is_hot)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+        `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,is_hot,import_batch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
         [l.brand || '—', l.series || null, l.cpu || null, l.ram || null, l.gpu || null, l.storage || null,
-         l.color || null, l.screen || null, l.touch || 'no', images[0] || null, images, l.priceBuyCny || 0, l.priceSellCny || 0, !!l.hot]
+         l.color || null, l.screen || null, l.touch || 'no', images[0] || null, images, l.priceBuyCny || 0, l.priceSellCny || 0, !!l.hot, batchId]
       );
       laptopIdMap[l.id] = r.rows[0].id;
       counts.laptops++;
@@ -68,10 +70,10 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
       if (!laptopId || !s.serial) continue;
       const saleClientId = s.saleClientId ? (clientIdMap[s.saleClientId] || null) : null;
       const r = await client.query(
-        `INSERT INTO serials (laptop_id, serial, status_id, arrival_date, sale_date, sale_client_id, warranty_months, warranty_notify, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (serial) DO NOTHING RETURNING id`,
+        `INSERT INTO serials (laptop_id, serial, status_id, arrival_date, sale_date, sale_client_id, warranty_months, warranty_notify, notes, import_batch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (serial) DO NOTHING RETURNING id`,
         [laptopId, s.serial, mapLegacyStatus(s.statusId), s.arrivalDate || null, s.saleDate || null, saleClientId,
-         s.warranty || 3, !!s.warrantyNotify, s.notes || null]
+         s.warranty || 3, !!s.warrantyNotify, s.notes || null, batchId]
       );
       if (r.rows[0]) {
         serialIdMap[s.serial] = r.rows[0].id;
@@ -90,9 +92,9 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
       let clientId = sale.clientId ? (clientIdMap[sale.clientId] || null) : null;
       if (!clientId) clientId = await getPlaceholderClientId();
       const r = await client.query(
-        `INSERT INTO sales (client_id, total_cny, total_rub, rate, payment_mode, note, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,now())) RETURNING id`,
-        [clientId, sale.totalCny || 0, sale.totalRub || 0, sale.rate || 13, sale.paymentMode || 'full', sale.note || null, sale.date || null]
+        `INSERT INTO sales (client_id, total_cny, total_rub, rate, payment_mode, note, created_at, import_batch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,now()),$8) RETURNING id`,
+        [clientId, sale.totalCny || 0, sale.totalRub || 0, sale.rate || 13, sale.paymentMode || 'full', sale.note || null, sale.date || null, batchId]
       );
       saleIdMap[sale.id] = r.rows[0].id;
       counts.sales++;
@@ -116,10 +118,10 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
         const amountRub = d.amountRub || (d.amountCny ? d.amountCny * (d.rateAtSale || 13) : 0);
         if (!amountRub) continue;
         await client.query(
-          `INSERT INTO debts (client_id, sale_id, amount_rub, amount_paid_rub, due_date, status, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,now()))`,
+          `INSERT INTO debts (client_id, sale_id, amount_rub, amount_paid_rub, due_date, status, created_at, import_batch_id)
+           VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,now()),$8)`,
           [newClientId, d.saleId ? (saleIdMap[d.saleId] || null) : null, amountRub, d.amountPaid || 0,
-           d.dueDate || null, d.status === 'paid' ? 'paid' : 'open', d.date || null]
+           d.dueDate || null, d.status === 'paid' ? 'paid' : 'open', d.date || null, batchId]
         );
         counts.debts++;
       }
@@ -128,9 +130,9 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
     // 6. Касса, курс, банковские счета
     for (const c of (data.cashLog || [])) {
       await client.query(
-        `INSERT INTO cash_log (type, amount_rub, note, category, bank_key, created_at)
-         VALUES ($1,$2,$3,'other',$4,COALESCE($5,now()))`,
-        [c.type === 'in' ? 'in' : 'out', c.amount || 0, c.note || null, c.bankDest || null, c.date || null]
+        `INSERT INTO cash_log (type, amount_rub, note, category, bank_key, created_at, import_batch_id)
+         VALUES ($1,$2,$3,'other',$4,COALESCE($5,now()),$6)`,
+        [c.type === 'in' ? 'in' : 'out', c.amount || 0, c.note || null, c.bankDest || null, c.date || null, batchId]
       );
       counts.cash++;
     }
@@ -147,10 +149,15 @@ router.post('/legacy-backup', authenticate, requirePermission('import', 'edit'),
       }
     }
 
+    await client.query(
+      'INSERT INTO import_batches (id, imported_by, counts, source_note) VALUES ($1,$2,$3,$4)',
+      [batchId, req.user.id, JSON.stringify(counts), 'Импорт из старой HTML-версии']
+    );
+
     await client.query('COMMIT');
     await logActivity(req.user, 'Импорт из старой версии', 'legacy_import',
       `клиенты: ${counts.clients}, модели: ${counts.laptops}, серийники: ${counts.serials}, продажи: ${counts.sales}`);
-    res.json({ success: true, counts });
+    res.json({ success: true, counts, batch_id: batchId });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
@@ -201,6 +208,69 @@ router.post('/laptops', authenticate, requirePermission('import', 'edit'), async
     res.status(201).json({ created });
   } catch (err) {
     await client.query('ROLLBACK');
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  } finally { client.release(); }
+});
+
+// Список партий импорта — что и когда загружали, сколько чего создалось
+router.get('/batches', authenticate, requirePermission('import', 'view'), async (req, res) => {
+  const result = await pool.query(`
+    SELECT ib.*, u.full_name AS imported_by_name FROM import_batches ib LEFT JOIN users u ON u.id = ib.imported_by
+    ORDER BY ib.imported_at DESC
+  `);
+  res.json(result.rows);
+});
+
+// Удалить конкретную партию импорта целиком — не трогая ничего, что было добавлено вручную
+// после импорта (клиенты удаляются, только если у них не появилось реальной активности с тех пор)
+router.delete('/batches/:id', authenticate, requirePermission('import', 'edit'), async (req, res) => {
+  const batchId = req.params.id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query('DELETE FROM serials WHERE import_batch_id=$1', [batchId]); // каскадом уйдёт serial_history, reservations
+
+    const salesRes = await client.query('SELECT id FROM sales WHERE import_batch_id=$1', [batchId]);
+    const saleIds = salesRes.rows.map(r => r.id);
+    if (saleIds.length) await client.query('DELETE FROM sale_items WHERE sale_id = ANY($1)', [saleIds]);
+    await client.query('DELETE FROM sales WHERE import_batch_id=$1', [batchId]);
+
+    await client.query('DELETE FROM debts WHERE import_batch_id=$1', [batchId]);
+    await client.query('DELETE FROM cash_log WHERE import_batch_id=$1', [batchId]);
+
+    const laptopsRes = await client.query('SELECT id FROM laptops WHERE import_batch_id=$1', [batchId]);
+    const laptopIds = laptopsRes.rows.map(r => r.id);
+    if (laptopIds.length) {
+      await client.query('DELETE FROM sale_items WHERE laptop_id = ANY($1)', [laptopIds]);
+      await client.query('DELETE FROM preorder_items WHERE laptop_id = ANY($1)', [laptopIds]);
+    }
+    await client.query('DELETE FROM laptops WHERE import_batch_id=$1', [batchId]); // каскадом уйдёт price_history
+
+    // Клиентов удаляем только если с момента импорта у них не появилось ничего своего —
+    // иначе можно случайно стереть реального клиента с настоящими продажами
+    const clientsRes = await client.query('SELECT id FROM clients WHERE import_batch_id=$1', [batchId]);
+    let clientsDeleted = 0;
+    for (const c of clientsRes.rows) {
+      const stillUsed = await client.query(`
+        SELECT (SELECT COUNT(*) FROM sales WHERE client_id=$1) +
+               (SELECT COUNT(*) FROM debts WHERE client_id=$1) +
+               (SELECT COUNT(*) FROM preorders WHERE client_id=$1) AS n
+      `, [c.id]);
+      if (Number(stillUsed.rows[0].n) === 0) {
+        await client.query('DELETE FROM clients WHERE id=$1', [c.id]);
+        clientsDeleted++;
+      }
+    }
+
+    await client.query('DELETE FROM import_batches WHERE id=$1', [batchId]);
+    await client.query('COMMIT');
+    await logActivity(req.user, '⚠️ Удалена партия импорта', 'legacy_import',
+      `моделей: ${laptopIds.length}, серийников удалено, клиентов: ${clientsDeleted}, продаж: ${saleIds.length}`);
+    res.json({ success: true, laptops_deleted: laptopIds.length, clients_deleted: clientsDeleted, sales_deleted: saleIds.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   } finally { client.release(); }
 });

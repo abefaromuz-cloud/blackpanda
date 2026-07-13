@@ -128,4 +128,40 @@ router.delete('/:id', authenticate, requirePermission('warehouse', 'edit'), asyn
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Объединение дублей модели — например, если импорт из старой версии создал две карточки
+// для одного и того же товара (одна с латиницей/кириллицей, другая с китайским названием).
+// Переносит все серийники, позиции продаж/предзаказов и историю цены на "оригинал",
+// затем удаляет карточку-дубль. Ничего не теряется — только объединяется в одну карточку.
+router.post('/merge', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
+  const { keep_id, remove_id } = req.body;
+  if (!keep_id || !remove_id) return res.status(400).json({ error: 'Укажите обе модели' });
+  if (keep_id === remove_id) return res.status(400).json({ error: 'Это одна и та же модель' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const [keepRes, removeRes] = await Promise.all([
+      client.query('SELECT id, brand, series FROM laptops WHERE id=$1 FOR UPDATE', [keep_id]),
+      client.query('SELECT id, brand, series FROM laptops WHERE id=$1 FOR UPDATE', [remove_id]),
+    ]);
+    if (!keepRes.rows[0] || !removeRes.rows[0]) throw { status: 404, message: 'Модель не найдена' };
+
+    await client.query('UPDATE serials SET laptop_id=$1 WHERE laptop_id=$2', [keep_id, remove_id]);
+    await client.query('UPDATE preorder_items SET laptop_id=$1 WHERE laptop_id=$2', [keep_id, remove_id]);
+    await client.query('UPDATE sale_items SET laptop_id=$1 WHERE laptop_id=$2', [keep_id, remove_id]);
+    await client.query('DELETE FROM price_history WHERE laptop_id=$1', [remove_id]); // история цены дубля неактуальна для оригинала
+    await client.query('DELETE FROM laptops WHERE id=$1', [remove_id]);
+
+    await client.query('COMMIT');
+    await logActivity(req.user, 'Объединены дубли моделей', 'laptop',
+      `${removeRes.rows[0].brand} ${removeRes.rows[0].series||''} → ${keepRes.rows[0].brand} ${keepRes.rows[0].series||''}`);
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  } finally { client.release(); }
+});
+
 module.exports = router;

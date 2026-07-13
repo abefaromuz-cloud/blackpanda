@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db/pool');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { logActivity } = require('../utils/activityLog');
+const { notifyIfPreorderWaiting } = require('../utils/preorderNotify');
 const router = express.Router();
 
 // Отчёт по приходам — группируется по дате и модели прямо из реальных данных склада,
@@ -59,6 +60,9 @@ router.post('/', authenticate, requirePermission('arrivals', 'edit'), async (req
     }
     await client.query('COMMIT');
     await logActivity(req.user, 'Приход товара', 'arrival', `${created.length} шт.`);
+
+    if (created.length > 0) await notifyIfPreorderWaiting(laptop_id, req.user.id);
+
     res.status(201).json({ created: created.length, skipped: serials.length - created.length });
   } catch (err) {
     await client.query('ROLLBACK');

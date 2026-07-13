@@ -454,10 +454,26 @@ CREATE TABLE IF NOT EXISTS msg_templates (
   text TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Разовая очистка дублей, накопившихся из-за прежнего бага (ON CONFLICT DO NOTHING не работал,
+-- потому что уникальный ключ был только на случайный id — конфликтов никогда не было, и при
+-- каждом прогоне миграции шаблоны тихо копировались). На каждое имя оставляем самую раннюю запись.
+DELETE FROM msg_templates a USING msg_templates b
+  WHERE a.name = b.name AND a.created_at > b.created_at;
+
+-- Теперь настоящий уникальный ключ по названию — повторный запуск больше никогда не продублирует.
+-- Обёрнуто проверкой, чтобы повторный прогон миграции не падал на "ограничение уже существует".
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'msg_templates_name_unique') THEN
+    ALTER TABLE msg_templates ADD CONSTRAINT msg_templates_name_unique UNIQUE (name);
+  END IF;
+END $$;
+
 INSERT INTO msg_templates (name, text) VALUES
   ('Подтверждение заказа','Здравствуйте, {name}! Ваш заказ подтверждён. Сумма: {total}. Спасибо за покупку!'),
   ('Напоминание о долге','Здравствуйте, {name}! Напоминаем о задолженности: {total}. Пожалуйста, оплатите в ближайшее время.')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 -- История курса ЦБ РФ (для сравнительного графика со своим курсом)
 CREATE TABLE IF NOT EXISTS cbr_rate_history (
@@ -566,3 +582,25 @@ CREATE TABLE IF NOT EXISTS price_history (
 INSERT INTO price_history (laptop_id, price_cny, changed_at)
   SELECT id, price_sell_cny, created_at FROM laptops l
   WHERE NOT EXISTS (SELECT 1 FROM price_history ph WHERE ph.laptop_id = l.id);
+
+-- Код доступа к разрушительным операциям (очистка склада/системы) — знает только владелец,
+-- хранится в виде хэша, не в открытом виде
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS danger_code_hash TEXT;
+
+-- Метка партии импорта — у каждой загрузки бэкапа старой версии свой ID, чтобы можно было
+-- удалить именно эту партию данных, не трогая остальное (в т.ч. добавленное вручную позже)
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+ALTER TABLE cash_log ADD COLUMN IF NOT EXISTS import_batch_id UUID;
+
+-- Журнал импортов — список партий с датой и количеством, чтобы было видно, что и когда загружали
+CREATE TABLE IF NOT EXISTS import_batches (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  imported_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  imported_by UUID REFERENCES users(id),
+  counts JSONB NOT NULL DEFAULT '{}',
+  source_note TEXT
+);

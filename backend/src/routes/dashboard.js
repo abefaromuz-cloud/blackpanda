@@ -13,7 +13,9 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
           COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock'))   AS in_stock,
           COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='intransit')) AS in_transit,
           COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='reserved'))  AS reserved,
-          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold'))      AS sold
+          COUNT(*) FILTER (WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold'))      AS sold,
+          (SELECT COUNT(DISTINCT l.id) FROM laptops l JOIN serials s2 ON s2.laptop_id = l.id
+            WHERE l.is_archived = false AND s2.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS models_in_stock
         FROM serials`),
       pool.query(`SELECT COALESCE(SUM(total_rub),0) AS total_rub, COUNT(*) AS count
         FROM sales WHERE created_at > now() - interval '30 days'`),

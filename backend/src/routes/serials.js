@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { notifyIfPreorderWaiting } = require('../utils/preorderNotify');
 const router = express.Router();
 
 // Поиск по ЧАСТИ серийного номера (для поисковой строки на складе) — важно: этот роут должен идти
@@ -66,6 +67,7 @@ router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (re
       `INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,$3)`,
       [result.rows[0].id, status_id || 'На складе', 'Добавлен на склад']
     );
+    notifyIfPreorderWaiting(laptop_id, req.user.id);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Такой серийник уже существует' });
@@ -92,6 +94,7 @@ router.post('/bulk', authenticate, requirePermission('warehouse', 'edit'), async
       if (r.rows[0]) created.push(r.rows[0]);
     }
     await client.query('COMMIT');
+    if (created.length > 0) notifyIfPreorderWaiting(laptop_id, req.user.id);
     res.status(201).json({ created: created.length, skipped: serials.length - created.length, items: created });
   } catch (err) {
     await client.query('ROLLBACK');

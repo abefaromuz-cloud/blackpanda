@@ -11,14 +11,24 @@ router.get('/', authenticate, requirePermission('broadcast', 'view'), async (req
 router.post('/', authenticate, requirePermission('broadcast', 'edit'), async (req, res) => {
   const { name, text } = req.body;
   if (!name || !text) return res.status(400).json({ error: 'Укажите название и текст' });
-  const result = await pool.query('INSERT INTO msg_templates (name, text) VALUES ($1,$2) RETURNING *', [name, text]);
-  res.status(201).json(result.rows[0]);
+  try {
+    const result = await pool.query('INSERT INTO msg_templates (name, text) VALUES ($1,$2) RETURNING *', [name, text]);
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Шаблон с таким названием уже есть — выбери другое имя или отредактируй существующий' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 router.put('/:id', authenticate, requirePermission('broadcast', 'edit'), async (req, res) => {
   const { name, text } = req.body;
-  const result = await pool.query('UPDATE msg_templates SET name=COALESCE($1,name), text=COALESCE($2,text) WHERE id=$3 RETURNING *', [name||null, text||null, req.params.id]);
-  res.json(result.rows[0]);
+  try {
+    const result = await pool.query('UPDATE msg_templates SET name=COALESCE($1,name), text=COALESCE($2,text) WHERE id=$3 RETURNING *', [name||null, text||null, req.params.id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Шаблон с таким названием уже есть' });
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
 });
 
 router.delete('/:id', authenticate, requirePermission('broadcast', 'edit'), async (req, res) => {
