@@ -12,6 +12,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { t, lang, setLang } = useLang();
+  const tt = useTT();
 
   async function submit(e) {
     e.preventDefault();

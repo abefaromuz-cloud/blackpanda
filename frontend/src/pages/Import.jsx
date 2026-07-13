@@ -74,11 +74,16 @@ function ImportBatchesBlock({ canEdit }) {
     finally { setBusyId(null); }
   }
 
-  if (!batches || !batches.length) return null;
+  if (batches === null) return null; // ещё грузится
 
   return (
     <div className="card mb-5">
       <div className="font-bold text-sm mb-3">📜 {tt("История импортов")}</div>
+      {!batches.length && (
+        <div className="text-text3 text-sm">
+          {tt("Пока нет ни одной сохранённой партии — эта функция запоминает только импорты, сделанные после её появления. Файлы, загруженные раньше, здесь не покажутся и удалить их так нельзя — используй «Опасная зона» в Админ-панели.")}
+        </div>
+      )}
       <div className="space-y-2">
         {batches.map(b => {
           const c = b.counts || {};

@@ -58,6 +58,7 @@ export default function LaptopDetail() {
   const [editForm, setEditForm] = useState(null);
   const { can } = useAuth();
   const { t } = useLang();
+  const tt = useTT();
   const { statuses, badgeClass, isInStock, displayLabel } = useStatuses();
   const { lib, tr } = useLibraryText();
   const canEdit = can('warehouse', 'edit');

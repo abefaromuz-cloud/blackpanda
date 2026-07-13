@@ -19,7 +19,6 @@ export default function Warehouse() {
   const [laptops, setLaptops] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [rate, setRate] = useState(0);
-  const [lib, setLib] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [aiLoading, setAiLoading] = useState(false);
@@ -39,7 +38,6 @@ export default function Warehouse() {
     api.get('/laptops').then(r => setLaptops(r.data));
     api.get('/reservations').then(r => setReservations(r.data));
     api.get('/settings/public-rate').then(r => setRate(r.data.rate));
-    api.get('/library').then(r => setLib(r.data));
   }
   useEffect(load, []);
 
@@ -347,51 +345,73 @@ export default function Warehouse() {
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
                 <th className="pb-2 pl-4 pt-3">{tt("Фото")}</th>
                 {th('brand', t('model'))}
-                <th className="pb-2">GPU</th><th className="pb-2">{tt("Цвет")}</th>
-                {th('price', tt('Цена'))}
+                <th className="pb-2">CPU</th>
+                <th className="pb-2">RAM</th>
+                <th className="pb-2">{tt("Накопитель")}</th>
+                <th className="pb-2">{tt("Видеокарта")}</th>
+                <th className="pb-2">{tt("Экран")}</th>
+                <th className="pb-2">{tt("Цвет")}</th>
+                <th className="pb-2">{tt("Статус")}</th>
                 {th('stock', t('inStock'))}
+                <th className="pb-2">{tt("Цена")} ¥</th>
+                <th className="pb-2">{tt("Курс")}</th>
+                <th className="pb-2">{tt("Цена")} ₽</th>
                 <th className="pb-2 pr-4"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(l => (
-                <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 ${Number(l.in_stock) === 0 ? 'opacity-50' : ''}`}>
-                  <td className="py-2 pl-4">
-                    <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
-                  </td>
-                  <td className="py-2">
-                    <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
-                      {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
-                    </Link>
-                    <div className="text-xs text-text3">{[tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage)].filter(Boolean).join(' · ')}</div>
-                    {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
-                  </td>
-                  <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
-                  <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
-                  <td className="py-2">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <div className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</div>
-                        <div className="text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</div>
+              {filtered.map(l => {
+                const inStock = Number(l.in_stock);
+                const reserved = Number(l.reserved);
+                const statusInfo = inStock > 0
+                  ? { label: tt('В наличии'), cls: 'badge-green' }
+                  : reserved > 0
+                    ? { label: tt('Резерв'), cls: 'badge-yellow' }
+                    : Number(l.total) > 0
+                      ? { label: tt('Продано'), cls: 'badge-red' }
+                      : { label: '—', cls: 'badge-blue' };
+                return (
+                  <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 ${inStock === 0 ? 'opacity-50' : ''}`}>
+                    <td className="py-2 pl-4">
+                      <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
+                    </td>
+                    <td className="py-2">
+                      <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
+                        {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
+                      </Link>
+                      {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
+                    </td>
+                    <td className="py-2 text-xs text-text3">{tr('cpu', l.cpu) || '—'}</td>
+                    <td className="py-2 text-xs text-text3">{tr('ram', l.ram) || '—'}</td>
+                    <td className="py-2 text-xs text-text3">{tr('storage', l.storage) || '—'}</td>
+                    <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
+                    <td className="py-2 text-xs text-text3">{tr('screen', l.screen) || '—'}</td>
+                    <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
+                    <td className="py-2"><span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span></td>
+                    <td className="py-2">
+                      <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
+                      <span className="text-text3 text-xs">/{l.total}</span>
+                      {l.days_left_forecast !== null && inStock > 0 && (
+                        <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
+                          ~{l.days_left_forecast} {tt('дн. запаса')}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
+                        <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
                       </div>
-                      <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
-                    </div>
-                  </td>
-                  <td className="py-2">
-                    <span className={`font-mono font-bold ${Number(l.in_stock) <= Number(l.low_stock_threshold) && Number(l.in_stock) > 0 ? 'text-red' : Number(l.in_stock) > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
-                    <span className="text-text3 text-xs">/{l.total}</span>
-                    {l.days_left_forecast !== null && Number(l.in_stock) > 0 && (
-                      <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
-                        ~{l.days_left_forecast} {tt('дн. запаса')}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-right">
-                    {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => remove(l.id)}>✕</button>}
-                  </td>
-                </tr>
-              ))}
-              {!filtered.length && <tr><td colSpan={7} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
+                    </td>
+                    <td className="py-2 text-xs text-text3 font-mono">{rate}</td>
+                    <td className="py-2 text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
+                    <td className="py-2 pr-4 text-right">
+                      {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => remove(l.id)}>✕</button>}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!filtered.length && <tr><td colSpan={14} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
             </tbody>
           </table>
         </div>
