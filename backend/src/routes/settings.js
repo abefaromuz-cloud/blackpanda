@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db/pool');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { sendTelegramMessage } = require('../utils/telegram');
+const { fetchAndSaveCbrRate } = require('../utils/cbrRate');
 const router = express.Router();
 
 router.get('/', authenticate, requirePermission('settings', 'view'), async (req, res) => {
@@ -56,6 +57,16 @@ router.post('/cbr-rate', authenticate, async (req, res) => {
 router.get('/cbr-rate-history', authenticate, async (req, res) => {
   const result = await pool.query('SELECT date, rate FROM cbr_rate_history ORDER BY date DESC LIMIT 400');
   res.json(result.rows);
+});
+
+// Ручное обновление курса ЦБ РФ — на случай, если хочешь проверить прямо сейчас,
+// не дожидаясь автоматического обновления на сервере
+router.post('/cbr-rate/refresh', authenticate, async (req, res) => {
+  try {
+    const rate = await fetchAndSaveCbrRate();
+    if (rate === null) return res.status(502).json({ error: 'Не удалось получить курс от ЦБ РФ — сервер официальных курсов недоступен' });
+    res.json({ rate });
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
 // Telegram-токен хранится и используется только на сервере — не уходит в браузер

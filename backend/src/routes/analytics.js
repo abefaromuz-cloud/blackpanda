@@ -133,7 +133,7 @@ router.get('/full', authenticate, requirePermission('analytics', 'view'), async 
         profit: toRubCny(Number(r.revenue_rub) - Number(r.cost_rub)),
         qty: Number(r.qty),
       })),
-      by_brand_stock: byBrandStock.rows,
+      by_brand_stock: byBrandStock.rows.map(r => ({ brand: r.brand, qty: Number(r.qty) })),
       top_models: topModels.rows.map(r => ({ brand: r.brand, series: r.series, sold_qty: Number(r.sold_qty), profit: toRubCny(Number(r.profit_rub)) })),
       by_manager: byManager.rows.map(r => ({
         id: r.id, full_name: r.full_name, orders: Number(r.orders),

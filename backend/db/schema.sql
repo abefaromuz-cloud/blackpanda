@@ -937,3 +937,6 @@ INSERT INTO lib_values (category, value, value_zh) VALUES
   ('color','Бежево-белый','海盐白'),
   ('color','Нежно-голубой','粉蓝色')
 ON CONFLICT (category, value) DO UPDATE SET value_zh = EXCLUDED.value_zh WHERE lib_values.value_zh IS NULL;
+
+-- Заметка о гарантийном случае по продаже — что именно произошло, если был возврат/ремонт по гарантии
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS warranty_note TEXT;
