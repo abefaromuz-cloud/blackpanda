@@ -99,6 +99,12 @@ export default function Warehouse() {
     load();
   }
 
+  async function restoreLaptop(id) {
+    if (!confirm(tt('Вернуть эту модель обратно в активный список?'))) return;
+    await api.post(`/laptops/${id}/restore`);
+    load();
+  }
+
   const opts = useMemo(() => {
     const seriesFromData = uniq(laptops.map(l => l.series));
     if (lib) {
@@ -348,51 +354,69 @@ export default function Warehouse() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(l => {
+              {filtered.map((l, idx) => {
                 const inStock = Number(l.in_stock);
                 const reserved = Number(l.reserved);
-                const statusInfo = inStock > 0
-                  ? { label: tt('В наличии'), cls: 'badge-green' }
-                  : reserved > 0
-                    ? { label: tt('Резерв'), cls: 'badge-yellow' }
-                    : Number(l.total) > 0
-                      ? { label: tt('Продано'), cls: 'badge-red' }
-                      : { label: '—', cls: 'badge-blue' };
+                const prevInStock = idx > 0 ? Number(filtered[idx - 1].in_stock) : null;
+                const showDivider = idx > 0 && prevInStock > 0 && inStock === 0;
+                const statusInfo = l.is_archived
+                  ? { label: tt('Архив'), cls: 'badge-blue' }
+                  : inStock > 0
+                    ? { label: tt('В наличии'), cls: 'badge-green' }
+                    : reserved > 0
+                      ? { label: tt('Резерв'), cls: 'badge-yellow' }
+                      : Number(l.total) > 0
+                        ? { label: tt('Продано'), cls: 'badge-red' }
+                        : { label: '—', cls: 'badge-blue' };
                 return (
-                  <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 ${inStock === 0 ? 'opacity-50' : ''}`}>
-                    <td className="py-2 pl-4">
-                      <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
-                    </td>
-                    <td className="py-2">
-                      <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
-                        {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
-                      </Link>
-                      {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
-                    </td>
-                    <td className="py-2 text-xs text-text3">{tr('cpu', l.cpu) || '—'}</td>
-                    <td className="py-2 text-xs text-text3">{tr('ram', l.ram) || '—'}</td>
-                    <td className="py-2 text-xs text-text3">{tr('storage', l.storage) || '—'}</td>
-                    <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
-                    <td className="py-2 text-xs text-text3">{tr('screen', l.screen) || '—'}</td>
-                    <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
-                    <td className="py-2"><span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span></td>
-                    <td className="py-2">
-                      <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
-                      {l.days_left_forecast !== null && inStock > 0 && (
-                        <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
-                          ~{l.days_left_forecast} {tt('дн. запаса')}
+                  <>
+                    {showDivider && (
+                      <tr key={`divider-${l.id}`}>
+                        <td colSpan={14} className="py-2 pl-4 text-[10px] uppercase text-text3 font-bold border-b border-border">
+                          ⬇️ {tt('Нет в наличии / архив')}
+                        </td>
+                      </tr>
+                    )}
+                    <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 ${inStock === 0 ? 'opacity-50' : ''} ${l.is_archived ? 'bg-bg3/40' : ''}`}>
+                      <td className="py-2 pl-4">
+                        <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
+                      </td>
+                      <td className="py-2">
+                        <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
+                          {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
+                        </Link>
+                        {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
+                      </td>
+                      <td className="py-2 text-xs text-text3">{tr('cpu', l.cpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{tr('ram', l.ram) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{tr('storage', l.storage) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{tr('screen', l.screen) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
+                      <td className="py-2">
+                        <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
+                        {l.is_archived && canEdit && (
+                          <button onClick={() => restoreLaptop(l.id)} className="block text-[10px] text-accent2 hover:underline mt-0.5">↩️ {tt('Восстановить')}</button>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
+                        {l.days_left_forecast !== null && inStock > 0 && (
+                          <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
+                            ~{l.days_left_forecast} {tt('дн. запаса')}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
+                          <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
                         </div>
-                      )}
-                    </td>
-                    <td className="py-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
-                        <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
-                      </div>
-                    </td>
-                    <td className="py-2 text-xs text-text3 font-mono">{rate}</td>
-                    <td className="py-2 pr-4 text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
-                  </tr>
+                      </td>
+                      <td className="py-2 text-xs text-text3 font-mono">{rate}</td>
+                      <td className="py-2 pr-4 text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
+                    </tr>
+                  </>
                 );
               })}
               {!filtered.length && <tr><td colSpan={14} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}

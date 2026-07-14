@@ -1,4 +1,4 @@
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Ruler, Cpu, MemoryStick, HardDrive, Gamepad2, Palette, Hand, Package, DollarSign, Tag, Eye, EyeOff } from 'lucide-react';
 import api from '../api/client';
@@ -43,6 +43,7 @@ export default function LaptopDetail() {
   const [l, setL] = useState(null);
   const [showMerge, setShowMerge] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showSold, setShowSold] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
@@ -423,43 +424,52 @@ export default function LaptopDetail() {
             </thead>
             <tbody>
               {(() => {
-                // Не проданные — сверху в исходном порядке, проданные — снизу, приглушённым цветом
+                // Не проданные — сверху в исходном порядке, проданные — снизу, свёрнуты по умолчанию
                 const notSold = l.serials.filter(s => bucketOf(s.status_id) !== 'sold');
                 const sold = l.serials.filter(s => bucketOf(s.status_id) === 'sold');
-                const sorted = [...notSold, ...sold];
-                return sorted.map((s, i) => {
+                const visible = showSold ? sold : [];
+                const sorted = [...notSold, ...visible];
+                const rows = sorted.map((s, i) => {
                   const days = s.arrival_date ? Math.floor((Date.now() - new Date(s.arrival_date)) / 86400000) : null;
                   const isSold = bucketOf(s.status_id) === 'sold';
-                  const isFirstSold = isSold && i === notSold.length;
                   return (
-                    <Fragment key={s.id}>
-                      {isFirstSold && (
-                        <tr key="sold-divider"><td colSpan={6} className="pt-3 pb-1 text-[10px] uppercase text-text3 font-bold">📦 {tt("Проданные")} ({sold.length})</td></tr>
-                      )}
-                      <tr className={`border-b border-border last:border-0 ${isSold ? 'opacity-45' : ''}`}>
-                        <td className="py-2">
-                          {canEdit && isInStock(s.status_id) && <input type="checkbox" checked={selected.includes(s.serial)} onChange={() => toggleSelect(s.serial)} />}
-                        </td>
-                        <td className="py-2 font-mono"><Link to={`/serials/${s.id}`} className="hover:text-accent2 hover:underline">{s.serial}</Link></td>
-                        <td className="py-2">
-                          {canEdit ? (
-                            <select className="inp text-xs py-1" value={s.status_id} onChange={e => changeStatus(s.id, e.target.value)}>
-                              {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
-                            </select>
-                          ) : (
-                            <span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-text3">{s.arrival_date ? new Date(s.arrival_date).toLocaleDateString('ru-RU') : '—'}</td>
-                        <td className="py-2 text-text3">{days !== null ? `${days}${tt('д')}` : '—'}</td>
-                        <td className="py-2 text-right whitespace-nowrap">
-                          <button className="text-text3 hover:text-accent2 text-xs mr-2" onClick={() => printSerialLabel({ serial: s.serial, brand: l.brand, series: l.series, specs: [l.cpu, l.ram, l.storage].filter(Boolean).join(' / '), arrivalDate: s.arrival_date })}>🏷️</button>
-                          {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => deleteSerial(s.id)}>✕</button>}
-                        </td>
-                      </tr>
-                    </Fragment>
+                    <tr key={s.id} className={`border-b border-border last:border-0 ${isSold ? 'opacity-45' : ''}`}>
+                      <td className="py-2">
+                        {canEdit && isInStock(s.status_id) && <input type="checkbox" checked={selected.includes(s.serial)} onChange={() => toggleSelect(s.serial)} />}
+                      </td>
+                      <td className="py-2 font-mono"><Link to={`/serials/${s.id}`} className="hover:text-accent2 hover:underline">{s.serial}</Link></td>
+                      <td className="py-2">
+                        {canEdit ? (
+                          <select className="inp text-xs py-1" value={s.status_id} onChange={e => changeStatus(s.id, e.target.value)}>
+                            {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
+                          </select>
+                        ) : (
+                          <span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-text3">{s.arrival_date ? new Date(s.arrival_date).toLocaleDateString('ru-RU') : '—'}</td>
+                      <td className="py-2 text-text3">{days !== null ? `${days}${tt('д')}` : '—'}</td>
+                      <td className="py-2 text-right whitespace-nowrap">
+                        <button className="text-text3 hover:text-accent2 text-xs mr-2" onClick={() => printSerialLabel({ serial: s.serial, brand: l.brand, series: l.series, specs: [l.cpu, l.ram, l.storage].filter(Boolean).join(' / '), arrivalDate: s.arrival_date })}>🏷️</button>
+                        {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => deleteSerial(s.id)}>✕</button>}
+                      </td>
+                    </tr>
                   );
                 });
+                return (
+                  <>
+                    {rows}
+                    {sold.length > 0 && (
+                      <tr>
+                        <td colSpan={6} className="pt-3 pb-1">
+                          <button onClick={() => setShowSold(s => !s)} className="text-[10px] uppercase text-text3 hover:text-text font-bold flex items-center gap-1">
+                            📦 {tt("Проданные")} ({sold.length}) {showSold ? '▲' : `▼ ${tt("показать")}`}
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
               })()}
               {!l.serials.length && <tr><td colSpan={6} className="text-center py-6 text-text3">{tt("Нет серийников")}</td></tr>}
             </tbody>
