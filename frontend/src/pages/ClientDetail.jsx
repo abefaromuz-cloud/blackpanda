@@ -20,6 +20,7 @@ export default function ClientDetail() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [managers, setManagers] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
   const { can } = useAuth();
   const { t } = useLang();
   const canEdit = can('clients', 'edit');
@@ -29,6 +30,12 @@ export default function ClientDetail() {
   useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
   useEffect(load, [id]);
   useEffect(() => { api.get('/clients/managers-list').then(r => setManagers(r.data)); }, []);
+  useEffect(() => { api.get('/wishlist', { params: { client_id: id } }).then(r => setWishlist(r.data)); }, [id]);
+
+  async function removeWish(wishId) {
+    await api.delete(`/wishlist/${wishId}`);
+    setWishlist(w => w.filter(x => x.id !== wishId));
+  }
   if (!c) return <div className="text-text3">{t('loading')}</div>;
 
   const openDebts = c.debts.filter(d => d.status === 'open');
@@ -102,6 +109,7 @@ export default function ClientDetail() {
     setEditForm({
       name: c.name, phone: c.phone || '', telegram: c.telegram || '', city: c.city || '',
       category: c.category, discount_percent: c.discount_percent, manager_id: c.manager_id || '', avatar_url: c.avatar_url || '',
+      source: c.source || '',
     });
     setEditing(true);
   }
@@ -139,6 +147,7 @@ export default function ClientDetail() {
                 {c.telegram && <span>✈️ {c.telegram} </span>}
                 {c.phone && <span>· {c.phone} </span>}
                 {c.city && <span>· 📍 {c.city}</span>}
+                {c.source && <span>· 🔗 {tt({ avito: 'Avito', wordofmouth: 'Сарафан', telegram: 'Telegram', marketplace: 'Маркетплейс', other: 'Другое' }[c.source] || c.source)}</span>}
               </div>
               <div className="text-xs text-text3 mt-1">{daysAgo === null ? tt('Покупок ещё не было') : daysAgo === 0 ? tt('Последняя покупка сегодня') : `Последняя покупка ${daysAgo} дн. назад`}</div>
             </div>
@@ -161,6 +170,12 @@ export default function ClientDetail() {
               {managers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
             <input className="inp" placeholder={tt("Ссылка на фото (аватар)")} value={editForm.avatar_url} onChange={e => setEditForm(f => ({ ...f, avatar_url: e.target.value }))} />
+            <select className="inp" value={editForm.source} onChange={e => setEditForm(f => ({ ...f, source: e.target.value }))}>
+              <option value="">{tt("Откуда пришёл")}</option>
+              <option value="avito">Avito</option><option value="wordofmouth">{tt("Сарафан")}</option>
+              <option value="telegram">Telegram</option><option value="marketplace">{tt("Маркетплейс")}</option>
+              <option value="other">{tt("Другое")}</option>
+            </select>
             <div className="col-span-2 md:col-span-4 flex gap-2">
               <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>{t('cancel')}</button>
               <button className="btn btn-primary">{t('save')}</button>
@@ -231,13 +246,14 @@ export default function ClientDetail() {
                     </div>
                     {d.amount_cny ? (
                       <div className="mb-1.5">
-                        <span className="block text-[9px] text-text3 uppercase font-bold">{tt('Долг в юанях ≈ рублей')}</span>
+                        <span className="block text-[9px] text-text3 uppercase font-bold">🇨🇳 {tt('Долг в юанях ≈ рублей')}</span>
                         <b className="text-red">¥{(Number(d.amount_cny) - Number(d.amount_paid_cny)).toLocaleString('ru-RU')} ≈ {remainingRub.toLocaleString('ru-RU')} ₽</b>
                       </div>
                     ) : (
                       <div className="mb-1.5">
-                        <span className="block text-[9px] text-text3 uppercase font-bold">{tt('Долг в рублях')}</span>
+                        <span className="block text-[9px] text-text3 uppercase font-bold">🇷🇺 {tt('Долг в рублях')}</span>
                         <b className="text-red">{remainingRub.toLocaleString('ru-RU')} ₽</b>
+                        <span className="text-text3 text-xs"> ≈ ¥{(remainingRub / rate).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} {tt('если платит юанями')}</span>
                       </div>
                     )}
                     {canEdit && (
@@ -273,6 +289,20 @@ export default function ClientDetail() {
             </Link>
           ))}
         </div>
+        {wishlist.length > 0 && (
+          <div className="card">
+            <div className="font-bold text-sm mb-3">👀 {tt("Отложенный интерес (без предоплаты)")}</div>
+            {wishlist.map(w => (
+              <div key={w.id} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0">
+                <Link to={`/warehouse/${w.laptop_id}`} className="hover:text-accent2">{w.brand} {w.series}</Link>
+                <span className="flex items-center gap-2">
+                  {w.notified ? <span className="badge badge-green text-[10px]">{tt('Уведомлён')}</span> : Number(w.in_stock) > 0 ? <span className="badge badge-yellow text-[10px]">{tt('Уже в наличии!')}</span> : <span className="text-text3 text-xs">{tt('Ждём поступления')}</span>}
+                  {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => removeWish(w.id)}>✕</button>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="card">
           <div className="font-bold text-sm mb-3">{t('sales')}</div>
           {c.sales.length === 0 && <div className="text-text3 text-sm">—</div>}

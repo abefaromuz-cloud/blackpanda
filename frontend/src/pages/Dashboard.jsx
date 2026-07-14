@@ -69,13 +69,6 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {can('warehouse', 'edit') && (
-        <div className="flex gap-2 flex-wrap mb-5">
-          <Link to="/scan" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">🔍</span><div><div className="text-xs font-bold">{tt("Быстрый поиск")}</div><div className="text-[10px] text-text3">{tt("По серийному номеру")}</div></div></Link>
-          <Link to="/clients" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">👤</span><div><div className="text-xs font-bold">{tt("Добавить клиента")}</div><div className="text-[10px] text-text3">{tt("Новый клиент в базу")}</div></div></Link>
-        </div>
-      )}
-
       {/* Сколько моделей и сколько единиц товара сейчас в наличии на складе */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <Link to="/warehouse" className="card flex items-center gap-3 hover:border-accent/50">
@@ -122,7 +115,11 @@ export default function Dashboard() {
             {d.debts.map(c => (
               <Link key={c.id} to={`/clients/${c.id}`} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
                 <span>{c.name}</span>
-                <span className="flex items-center gap-2"><span className="font-mono text-red">{Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span><span className="text-xs text-accent2">{tt("Напомнить")} →</span></span>
+                <span className="flex items-center gap-2 flex-wrap justify-end">
+                  {Number(c.debt_rub) > 0 && <span className="font-mono text-red text-xs">🇷🇺 {Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>}
+                  {Number(c.debt_cny) > 0 && <span className="font-mono text-red text-xs">🇨🇳 ¥{Number(c.debt_cny).toLocaleString('ru-RU')}</span>}
+                  <span className="text-xs text-accent2">{tt("Напомнить")} →</span>
+                </span>
               </Link>
             ))}
           </div>

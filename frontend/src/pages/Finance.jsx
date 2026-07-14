@@ -46,9 +46,12 @@ export default function Finance() {
           <div className="font-bold text-sm mb-3">💰 {t('debtors')}</div>
           {d.debtors.length === 0 && <div className="text-text3 text-sm">{t('noDebts')}</div>}
           {d.debtors.map(c => (
-            <Link key={c.id} to={`/clients/${c.id}`} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
+            <Link key={c.id} to={`/clients/${c.id}`} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 hover:text-accent2">
               <span>{c.name}</span>
-              <span className="text-red font-mono">{Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>
+              <span className="flex items-center gap-2 flex-wrap justify-end">
+                {Number(c.debt_rub) > 0 && <span className="text-red font-mono text-xs">🇷🇺 {Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>}
+                {Number(c.debt_cny) > 0 && <span className="text-red font-mono text-xs">🇨🇳 ¥{Number(c.debt_cny).toLocaleString('ru-RU')}</span>}
+              </span>
             </Link>
           ))}
         </div>
@@ -93,13 +96,28 @@ function OperationBlock({ clients, banks, onDone }) {
   const [opType, setOpType] = useState('in');
   const [dest, setDest] = useState('cash');
   const [amount, setAmount] = useState('');
+  const [debtCurrency, setDebtCurrency] = useState('rub'); // rub | cny — валюта нового долга
   const [note, setNote] = useState('');
   const [recipient, setRecipient] = useState('');
   const [clientId, setClientId] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [msg, setMsg] = useState('');
+  const [rate, setRate] = useState(0);
+  const [openDebts, setOpenDebts] = useState([]);
+  const [payAmounts, setPayAmounts] = useState({});
+  const [payBusy, setPayBusy] = useState(false);
 
-  function reset() { setAmount(''); setNote(''); setRecipient(''); setDueDate(''); }
+  useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
+
+  useEffect(() => {
+    if (action === 'payoff' && clientId) {
+      api.get(`/clients/${clientId}`).then(r => setOpenDebts(r.data.debts.filter(d => d.status === 'open')));
+    } else {
+      setOpenDebts([]);
+    }
+  }, [action, clientId]);
+
+  function reset() { setAmount(''); setNote(''); setRecipient(''); setDueDate(''); setDebtCurrency('rub'); }
 
   async function submit(e) {
     e.preventDefault();
@@ -112,15 +130,39 @@ function OperationBlock({ clients, banks, onDone }) {
         await api.post(`/clients/${clientId}/balance`, { amount_rub: Number(amount), note: note || tt('Пополнение баланса') });
       } else if (action === 'debt') {
         if (!clientId) return;
-        await api.post(`/clients/${clientId}/debts`, { amount_rub: Number(amount), due_date: dueDate || null, note });
-      } else if (action === 'payoff') {
-        if (!clientId) return;
-        await api.post(`/clients/${clientId}/debts/payoff`);
+        const payload = debtCurrency === 'cny'
+          ? { amount_cny: Number(amount), due_date: dueDate || null, note }
+          : { amount_rub: Number(amount), due_date: dueDate || null, note };
+        await api.post(`/clients/${clientId}/debts`, payload);
+      } else {
+        return; // payoff обрабатывается отдельными кнопками на каждый долг, не общей кнопкой формы
       }
       setMsg('✅ ' + tt('Готово')); reset(); onDone();
     } catch (e2) {
       setMsg('❌ ' + (e2.response?.data?.error || tt('Ошибка')));
     }
+  }
+
+  async function payDebt(debt, amountInput) {
+    setPayBusy(true);
+    try {
+      let amountRub;
+      if (debt.amount_cny) {
+        const remainingRub = Math.round((Number(debt.amount_cny) - Number(debt.amount_paid_cny)) * rate);
+        amountRub = amountInput ? Math.min(Number(amountInput), remainingRub) : remainingRub;
+      } else {
+        const remaining = Number(debt.amount_rub) - Number(debt.amount_paid_rub);
+        amountRub = amountInput ? Math.min(Number(amountInput), remaining) : remaining;
+      }
+      await api.post(`/clients/${clientId}/debts/${debt.id}/pay`, { amount_rub: amountRub });
+      setPayAmounts(a => ({ ...a, [debt.id]: '' }));
+      const r = await api.get(`/clients/${clientId}`);
+      setOpenDebts(r.data.debts.filter(d => d.status === 'open'));
+      setMsg('✅ ' + tt('Готово'));
+      onDone();
+    } catch (e2) {
+      setMsg('❌ ' + (e2.response?.data?.error || tt('Ошибка')));
+    } finally { setPayBusy(false); }
   }
 
   return (
@@ -153,17 +195,48 @@ function OperationBlock({ clients, banks, onDone }) {
         </select>
       )}
 
-      {action !== 'payoff' && (
-        <input className="inp mb-3" type="number" placeholder={tt("Сумма") + " ₽"} value={amount} onChange={e => setAmount(e.target.value)} required />
+      {action === 'debt' && (
+        <div className="flex gap-2 mb-3">
+          <button type="button" onClick={() => setDebtCurrency('rub')} className={`btn btn-sm flex-1 ${debtCurrency === 'rub' ? 'btn-primary' : 'btn-secondary'}`}>🇷🇺 ₽</button>
+          <button type="button" onClick={() => setDebtCurrency('cny')} className={`btn btn-sm flex-1 ${debtCurrency === 'cny' ? 'btn-primary' : 'btn-secondary'}`}>🇨🇳 ¥</button>
+        </div>
+      )}
+
+      {(action === 'op' || action === 'topup' || action === 'debt') && (
+        <input className="inp mb-3" type="number" placeholder={tt("Сумма") + (action === 'debt' && debtCurrency === 'cny' ? ' ¥' : ' ₽')} value={amount} onChange={e => setAmount(e.target.value)} required />
       )}
       {action === 'debt' && (
         <input className="inp mb-3" type="date" placeholder={tt("Срок оплаты")} value={dueDate} onChange={e => setDueDate(e.target.value)} />
       )}
-      {action !== 'payoff' && (
+      {(action === 'op' || action === 'topup' || action === 'debt') && (
         <input className="inp mb-3" placeholder={tt("Комментарий")} value={note} onChange={e => setNote(e.target.value)} />
       )}
 
-      <button className="btn btn-primary w-full justify-center">{tt("Выполнить")}</button>
+      {action === 'payoff' && clientId && (
+        <div className="mb-3 space-y-2">
+          {!openDebts.length && <div className="text-text3 text-sm">{tt('У этого клиента нет открытых долгов')}</div>}
+          {openDebts.map(d => {
+            const isCny = !!d.amount_cny;
+            const remainingRub = isCny ? Math.round((Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate) : Math.round(Number(d.amount_rub) - Number(d.amount_paid_rub));
+            const remainingCny = isCny ? (Number(d.amount_cny) - Number(d.amount_paid_cny)) : (remainingRub / rate);
+            return (
+              <div key={d.id} className="bg-bg3 rounded-xl p-2.5">
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span>{isCny ? '🇨🇳' : '🇷🇺'} {new Date(d.created_at).toLocaleDateString('ru-RU')}</span>
+                  <b className="text-red">{isCny ? `¥${remainingCny.toLocaleString('ru-RU')} ≈ ` : ''}{remainingRub.toLocaleString('ru-RU')} ₽</b>
+                </div>
+                <div className="flex gap-1.5">
+                  <input className="inp inp-sm flex-1" type="number" placeholder={tt('Сумма, ₽')} value={payAmounts[d.id] || ''} onChange={e => setPayAmounts(a => ({ ...a, [d.id]: e.target.value }))} />
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={!payAmounts[d.id] || payBusy} onClick={() => payDebt(d, payAmounts[d.id])}>{tt('Часть')}</button>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={payBusy} onClick={() => payDebt(d, null)}>{tt('Всё')}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {action !== 'payoff' && <button className="btn btn-primary w-full justify-center">{tt("Выполнить")}</button>}
       {msg && <div className="text-sm mt-2">{msg}</div>}
     </form>
   );

@@ -9,7 +9,7 @@ import { useTT } from '../i18n/useTT';
 const CATEGORY_LABEL_RU = { retail: 'Розница', wholesale: 'Опт', vip: 'VIP' };
 const CATEGORY_BADGE = { retail: 'badge-blue', wholesale: 'badge-purple', vip: 'badge-yellow' };
 
-const emptyForm = { name: '', phone: '', telegram: '', city: '', category: 'retail', discount_percent: 0, manager_id: '' };
+const emptyForm = { name: '', phone: '', telegram: '', city: '', category: 'retail', discount_percent: 0, manager_id: '', source: '' };
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -109,6 +109,12 @@ export default function Clients() {
           <select className="inp" value={form.manager_id} onChange={e => setForm(f => ({ ...f, manager_id: e.target.value }))}>
             <option value="">— {tt("Менеджер")} —</option>
             {managers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+          </select>
+          <select className="inp" value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
+            <option value="">{tt("Откуда пришёл")}</option>
+            <option value="avito">Avito</option><option value="wordofmouth">{tt("Сарафан")}</option>
+            <option value="telegram">Telegram</option><option value="marketplace">{tt("Маркетплейс")}</option>
+            <option value="other">{tt("Другое")}</option>
           </select>
           <button className="btn btn-primary">{t('save')}</button>
         </form>

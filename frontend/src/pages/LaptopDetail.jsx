@@ -47,6 +47,13 @@ export default function LaptopDetail() {
   const [l, setL] = useState(null);
   const [showMerge, setShowMerge] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showWishlist, setShowWishlist] = useState(false);
+  const [wishClients, setWishClients] = useState([]);
+  const [wishClientId, setWishClientId] = useState('');
+  const [wishNote, setWishNote] = useState('');
+  const [wishSaving, setWishSaving] = useState(false);
+  const [wishDone, setWishDone] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [showSold, setShowSold] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -116,6 +123,32 @@ export default function LaptopDetail() {
       alert(e2.response?.data?.error || 'Ошибка удаления');
       setDeleting(false);
     }
+  }
+
+  function openWishlist() {
+    setShowWishlist(s => !s);
+    setWishDone(false);
+    if (!wishClients.length) api.get('/clients').then(r => setWishClients(r.data));
+  }
+
+  async function saveWishlist() {
+    if (!wishClientId) return;
+    setWishSaving(true);
+    try {
+      await api.post('/wishlist', { client_id: wishClientId, laptop_id: id, note: wishNote });
+      setWishDone(true);
+      setWishClientId(''); setWishNote('');
+    } catch (e2) {
+      alert(e2.response?.data?.error || 'Ошибка');
+    } finally { setWishSaving(false); }
+  }
+
+  function copyShareLink() {
+    const url = `${window.location.origin}/p/${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 2000);
+    }).catch(() => alert(url));
   }
 
   async function addOne(e) {
@@ -225,6 +258,8 @@ export default function LaptopDetail() {
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMerge(s => !s)}>🔗 {tt("Объединить дубль")}</button>}
           {canEdit && <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(s => !s)}>🗑️ {tt("Удалить модель")}</button>}
+          {canEdit && <button className="btn btn-secondary btn-sm" onClick={openWishlist}>👀 {tt("Клиент ждёт эту модель")}</button>}
+          <button className="btn btn-secondary btn-sm" onClick={copyShareLink}>🔗 {shareLinkCopied ? tt('Скопировано!') : tt('Ссылка для клиента')}</button>
         </div>
       </div>
 
@@ -271,6 +306,27 @@ export default function LaptopDetail() {
             </button>
             <button className="text-text3 text-xs hover:text-text" onClick={() => { setShowDelete(false); setDeleteConfirmText(''); }}>{t('cancel')}</button>
           </div>
+        </div>
+      )}
+
+      {showWishlist && (
+        <div className="card mb-5">
+          <div className="font-bold text-sm mb-1">👀 {tt("Отметить, что клиент ждёт эту модель")}</div>
+          <div className="text-xs text-text3 mb-3">{tt("Без предоплаты и обязательств — просто напоминание. Когда модель появится на складе, клиенту (если есть Telegram) придёт уведомление, а тебе — задача.")}</div>
+          {wishDone ? (
+            <div className="text-green text-sm">✅ {tt("Отмечено — уведомим при поступлении")}</div>
+          ) : (
+            <>
+              <select className="inp mb-2" value={wishClientId} onChange={e => setWishClientId(e.target.value)}>
+                <option value="">{t('chooseClientOpt')}</option>
+                {wishClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input className="inp mb-3" placeholder={tt("Комментарий (необязательно)")} value={wishNote} onChange={e => setWishNote(e.target.value)} />
+              <button className="btn btn-primary btn-sm" onClick={saveWishlist} disabled={!wishClientId || wishSaving}>
+                {wishSaving ? tt('Сохраняю...') : tt('Сохранить')}
+              </button>
+            </>
+          )}
         </div>
       )}
 

@@ -56,7 +56,7 @@ export default function Header() {
   // вырос — сигнатура изменится, и уведомление снова покажется как новое, даже если старое
   // уже было очищено.
   function lowStockSig(l) { return `stock:${l.id}:${l.in_stock}`; }
-  function debtSig(c) { return `debt:${c.id}:${Math.round(c.debt_rub)}`; }
+  function debtSig(c) { return `debt:${c.id}:${Math.round(c.debt_rub)}:${Math.round(c.debt_cny || 0)}`; }
   const visibleLowStock = notifData.lowStock.filter(l => !dismissed.includes(lowStockSig(l)));
   const visibleDebts = notifData.debts.filter(c => !dismissed.includes(debtSig(c)));
   const visibleCount = visibleLowStock.length + visibleDebts.length;
@@ -154,7 +154,11 @@ export default function Header() {
                   <div className="text-[10px] text-red uppercase font-bold mb-1">💰 {tt("Должники")}</div>
                   {visibleDebts.map(c => (
                     <button key={c.id} onClick={() => { setNotifOpen(false); navigate(`/clients/${c.id}`); }} className="w-full text-left text-xs py-1 hover:text-accent2 flex justify-between">
-                      <span>{c.name}</span><span className="font-mono text-red">{Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>
+                      <span>{c.name}</span>
+                      <span className="flex items-center gap-1.5">
+                        {Number(c.debt_rub) > 0 && <span className="font-mono text-red">🇷🇺{Math.round(c.debt_rub).toLocaleString('ru-RU')}₽</span>}
+                        {Number(c.debt_cny) > 0 && <span className="font-mono text-red">🇨🇳¥{Number(c.debt_cny).toLocaleString('ru-RU')}</span>}
+                      </span>
                     </button>
                   ))}
                 </div>

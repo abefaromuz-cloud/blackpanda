@@ -73,7 +73,7 @@ export default function Scan() {
       const { data } = await api.get(`/serials/lookup/${encodeURIComponent(s)}`);
       if (data.bucket === 'instock' || data.bucket === 'reserved') {
         beep(true);
-        setScanned(a => [...a, { serial: s, status: 'ok', id: data.id, laptop_id: data.laptop_id, brand: data.brand, series: data.series }]);
+        setScanned(a => [...a, { serial: s, status: 'ok', id: data.id, laptop_id: data.laptop_id, brand: data.brand, series: data.series, service_visits: Number(data.service_visits || 0), warranty_cases: Number(data.warranty_cases || 0) }]);
       } else {
         beep(false);
         setScanned(a => [...a, { serial: s, status: 'sold', id: data.id }]);
@@ -196,14 +196,22 @@ export default function Scan() {
             </form>
             <div className="max-h-64 overflow-y-auto mb-3">
               {scanned.map((s, i) => (
-                <div key={i} className={`flex justify-between items-center px-3 py-2 rounded-lg mb-1 text-sm ${s.status === 'ok' ? 'bg-green/10 border border-green' : s.status === 'sold' ? 'bg-yellow/10 border border-yellow' : 'bg-red/10 border border-red'}`}>
-                  {s.id ? (
-                    <Link to={`/serials/${s.id}`} target="_blank" className="font-mono hover:underline hover:text-accent2" title={tt("Открыть карточку / историю серийника")}>{s.serial}</Link>
-                  ) : (
-                    <span className="font-mono">{s.serial}</span>
+                <div key={i} className={`px-3 py-2 rounded-lg mb-1 text-sm ${s.status === 'ok' ? 'bg-green/10 border border-green' : s.status === 'sold' ? 'bg-yellow/10 border border-yellow' : 'bg-red/10 border border-red'}`}>
+                  <div className="flex justify-between items-center">
+                    {s.id ? (
+                      <Link to={`/serials/${s.id}`} target="_blank" className="font-mono hover:underline hover:text-accent2" title={tt("Открыть карточку / историю серийника")}>{s.serial}</Link>
+                    ) : (
+                      <span className="font-mono">{s.serial}</span>
+                    )}
+                    <span className="text-xs">{s.status === 'ok' ? `${s.brand} ${s.series}` : s.status === 'sold' ? tt('уже продан/недоступен') : t('notFound')}</span>
+                    <button onClick={() => removeScanned(i)} className="text-text3 hover:text-red">✕</button>
+                  </div>
+                  {s.status === 'ok' && s.service_visits > 0 && (
+                    <div className="text-[11px] text-yellow mt-1">
+                      ⚠️ {tt('У этого устройства было')} {s.service_visits} {s.service_visits === 1 ? tt('обращение в сервис') : tt('обращений в сервис')}
+                      {s.warranty_cases > 0 && ` (${tt('включая гарантийный случай')})`} — {tt('стоит предупредить клиента заранее')}
+                    </div>
                   )}
-                  <span className="text-xs">{s.status === 'ok' ? `${s.brand} ${s.series}` : s.status === 'sold' ? tt('уже продан/недоступен') : t('notFound')}</span>
-                  <button onClick={() => removeScanned(i)} className="text-text3 hover:text-red">✕</button>
                 </div>
               ))}
               {!scanned.length && <div className="text-text3 text-sm">—</div>}

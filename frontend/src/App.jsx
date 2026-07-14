@@ -14,6 +14,7 @@ import Cash from './pages/Cash';
 import Settings from './pages/Settings';
 import Admin from './pages/Admin';
 import ClientPortal from './pages/ClientPortal';
+import PublicLaptop from './pages/PublicLaptop';
 import Employees from './pages/Employees';
 import Finance from './pages/Finance';
 import Analytics from './pages/Analytics';
@@ -62,6 +63,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/portal" element={<ClientGuard><ClientPortal /></ClientGuard>} />
+      <Route path="/p/:id" element={<PublicLaptop />} />
       <Route path="/" element={<Guard><Layout /></Guard>}>
         <Route index element={<PermGuard page="dashboard"><Dashboard /></PermGuard>} />
         <Route path="warehouse" element={<PermGuard page="warehouse"><Warehouse /></PermGuard>} />
