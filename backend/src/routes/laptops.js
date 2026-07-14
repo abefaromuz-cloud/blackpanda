@@ -25,9 +25,8 @@ router.get('/', authenticate, requirePermission('warehouse', 'view'), async (req
         ), '[]') AS price_sparkline
       FROM laptops l
       LEFT JOIN serials s ON s.laptop_id = l.id
-      WHERE l.is_archived = false
       GROUP BY l.id
-      ORDER BY l.created_at DESC
+      ORDER BY l.is_archived ASC, l.created_at DESC
     `);
     // Прогноз: сколько дней хватит остатка при текущем темпе продаж (среднее в день за последние 30 дней)
     const rows = result.rows.map(r => {
@@ -124,6 +123,14 @@ router.delete('/:id', authenticate, requirePermission('warehouse', 'edit'), asyn
   try {
     // Мягкое удаление — чтобы не потерять историю продаж по этой модели
     await pool.query('UPDATE laptops SET is_archived=true WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
+// Восстановить ранее удалённую (архивную) модель — на случай, если удалили по ошибке
+router.post('/:id/restore', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
+  try {
+    await pool.query('UPDATE laptops SET is_archived=false WHERE id=$1', [req.params.id]);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });

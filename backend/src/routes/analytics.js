@@ -44,7 +44,10 @@ router.get('/full', authenticate, requirePermission('analytics', 'view'), async 
     const [cur, prev, stockNow, modelsNow, sparkline, dynamics, byBrandStock, topModels, byManager, payMethods, receivables, avgPayTerm, slowStock, topClients, geography] = await Promise.all([
       periodStats(fromDate, toDate),
       periodStats(prevFrom, prevTo),
-      pool.query(`SELECT COUNT(*) AS n FROM serials WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')`),
+      pool.query(`
+        SELECT COUNT(*) AS n FROM serials s JOIN laptops l ON l.id = s.laptop_id
+        WHERE l.is_archived = false AND s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')
+      `),
       pool.query(`
         SELECT COUNT(DISTINCT l.id) AS n FROM laptops l JOIN serials s ON s.laptop_id = l.id
         WHERE l.is_archived = false AND s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')
