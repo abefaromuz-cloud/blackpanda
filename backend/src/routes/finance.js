@@ -20,14 +20,14 @@ router.get('/', authenticate, requirePermission('finance', 'view'), async (req, 
       `),
       pool.query(`
         SELECT COALESCE(category,'other') AS category, SUM(amount_rub) AS total
-        FROM cash_log WHERE type='out' AND created_at > now() - interval '12 months'
+        FROM cash_log WHERE type='out' AND (category IS DISTINCT FROM 'exchanger') AND created_at > now() - interval '12 months'
         GROUP BY 1 ORDER BY total DESC
       `),
       pool.query(`
         SELECT
           COALESCE((SELECT SUM(si.total_cny * st.rate) FROM sale_items si CROSS JOIN (SELECT rate FROM settings WHERE id=1) st),0) AS lifetime_revenue_rub,
           COALESCE((SELECT SUM(si.price_cost_cny*si.qty * st.rate) FROM sale_items si CROSS JOIN (SELECT rate FROM settings WHERE id=1) st),0) AS lifetime_cost_rub,
-          COALESCE((SELECT SUM(amount_rub) FROM cash_log WHERE type='out'),0) AS lifetime_expenses_rub
+          COALESCE((SELECT SUM(amount_rub) FROM cash_log WHERE type='out' AND (category IS DISTINCT FROM 'exchanger')),0) AS lifetime_expenses_rub
       `),
       // Должники — как и раньше на дашборде, юаневые долги пересчитываются по сегодняшнему курсу
       pool.query(`

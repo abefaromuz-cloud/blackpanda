@@ -145,9 +145,12 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
           [paidNow, client_id]);
       }
       if (remaining > 0.5) {
+        // Долг фиксируем В ЮАНЯХ (по курсу этой продажи) — при погашении позже пересчитается
+        // по курсу на день оплаты, а не застынет на сегодняшнем курсе
+        const remainingCny = Math.round((remaining / rate) * 100) / 100;
         await client.query(
-          'INSERT INTO debts (client_id, sale_id, amount_rub, due_date) VALUES ($1,$2,$3,$4)',
-          [client_id, sale.rows[0].id, remaining, due_date || null]
+          'INSERT INTO debts (client_id, sale_id, amount_rub, amount_cny, due_date) VALUES ($1,$2,$3,$4,$5)',
+          [client_id, sale.rows[0].id, remaining, remainingCny, due_date || null]
         );
       }
     } else if (mode === 'split') {

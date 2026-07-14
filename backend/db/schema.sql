@@ -940,3 +940,27 @@ ON CONFLICT (category, value) DO UPDATE SET value_zh = EXCLUDED.value_zh WHERE l
 
 -- Заметка о гарантийном случае по продаже — что именно произошло, если был возврат/ремонт по гарантии
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS warranty_note TEXT;
+
+-- Переход на реалистичную для этого бизнеса логику (как в старой версии): каждое устройство
+-- в заявке идёт по этапам "отправка в Китай на ремонт", а не просто "в работе/готово".
+-- Стоимость теперь в юанях (ремонт происходит в Китае), плюс трек-номер и ожидаемая дата.
+ALTER TABLE service_order_items ADD COLUMN IF NOT EXISTS cost_cny NUMERIC(12,2) DEFAULT 0;
+ALTER TABLE service_order_items ADD COLUMN IF NOT EXISTS tracking TEXT;
+ALTER TABLE service_order_items ADD COLUMN IF NOT EXISTS expected_date DATE;
+-- Переносим уже введённые суммы из рублей в юани по текущему курсу (разово, если ещё не переносили)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='service_order_items' AND column_name='cost_rub') THEN
+    UPDATE service_order_items SET cost_cny = ROUND(cost_rub / (SELECT rate FROM settings WHERE id=1), 2)
+      WHERE cost_cny = 0 AND cost_rub > 0;
+  END IF;
+END $$;
+
+-- История смены этапов по каждому устройству в сервисе — аналогично serial_history
+CREATE TABLE IF NOT EXISTS service_item_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  service_item_id UUID NOT NULL REFERENCES service_order_items(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

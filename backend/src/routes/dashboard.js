@@ -115,7 +115,7 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
         refurbished: statusMap['Склад (восст.)'] || 0,
       },
       yearly_profit_rub: yearlyProfitRub,
-      by_brand: byBrand.rows,
+      by_brand: byBrand.rows.map(r => ({ brand: r.brand, qty: Number(r.qty) })),
       recent_sales: recentSales.rows,
       recent_activity: recentActivity.rows,
       tasks: tasks.rows,

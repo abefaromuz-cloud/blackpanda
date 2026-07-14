@@ -41,10 +41,14 @@ router.get('/full', authenticate, requirePermission('analytics', 'view'), async 
       };
     };
 
-    const [cur, prev, stockNow, sparkline, dynamics, byBrandStock, topModels, byManager, payMethods, receivables, avgPayTerm, slowStock, topClients, geography] = await Promise.all([
+    const [cur, prev, stockNow, modelsNow, sparkline, dynamics, byBrandStock, topModels, byManager, payMethods, receivables, avgPayTerm, slowStock, topClients, geography] = await Promise.all([
       periodStats(fromDate, toDate),
       periodStats(prevFrom, prevTo),
       pool.query(`SELECT COUNT(*) AS n FROM serials WHERE status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')`),
+      pool.query(`
+        SELECT COUNT(DISTINCT l.id) AS n FROM laptops l JOIN serials s ON s.laptop_id = l.id
+        WHERE l.is_archived = false AND s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')
+      `),
       pool.query(`
         SELECT d.day::date AS day,
           COALESCE(SUM(s.total_rub) FILTER (WHERE date_trunc('day', s.created_at) = d.day), 0) AS revenue_rub
@@ -124,6 +128,7 @@ router.get('/full', authenticate, requirePermission('analytics', 'view'), async 
         profit: { ...toRubCny(cur.profit_rub), change_pct: pctChange(cur.profit_rub, prev.profit_rub) },
         sold_qty: { value: cur.sold_qty, change_pct: pctChange(cur.sold_qty, prev.sold_qty) },
         stock_now: { value: Number(stockNow.rows[0].n) },
+        models_now: { value: Number(modelsNow.rows[0].n) },
         new_clients: { value: cur.new_clients, change_pct: pctChange(cur.new_clients, prev.new_clients) },
       },
       sparkline: sparkline.rows.map(r => Number(r.revenue_rub)),
