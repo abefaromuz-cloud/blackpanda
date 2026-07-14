@@ -11,6 +11,7 @@ import { useTT } from '../i18n/useTT';
 const emptyForm = {
   brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: 'no',
   images: [''], cost_cny: '', price_sell_cny: '', low_stock_threshold: 2, is_hot: false, mfr_item_code: '',
+  refresh_rate: '', screen_type: '', keyboard_backlight: '', keyboard_layout: '',
 };
 
 function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort(); }
@@ -86,7 +87,8 @@ export default function Warehouse() {
     if (!brandInLib || form.series) {
       await api.post('/library/quick-add', { category: 'brand_series', brand_name: form.brand, series_name: form.series });
     }
-    for (const [cat, val] of [['cpu', form.cpu], ['gpu', form.gpu], ['ram', form.ram], ['storage', form.storage], ['color', form.color], ['screen', form.screen]]) {
+    for (const [cat, val] of [['cpu', form.cpu], ['gpu', form.gpu], ['ram', form.ram], ['storage', form.storage], ['color', form.color], ['screen', form.screen],
+      ['refresh_rate', form.refresh_rate], ['screen_type', form.screen_type], ['keyboard_backlight', form.keyboard_backlight], ['keyboard_layout', form.keyboard_layout]]) {
       if (val && !(lib?.values[cat] || []).some(v => v.value === val)) {
         await api.post('/library/quick-add', { category: cat, value: val });
       }
@@ -113,11 +115,17 @@ export default function Warehouse() {
         cpu: lib.values.cpu.map(v => v.value), ram: lib.values.ram.map(v => v.value),
         gpu: lib.values.gpu.map(v => v.value), storage: lib.values.storage.map(v => v.value),
         color: lib.values.color.map(v => v.value), screen: lib.values.screen.map(v => v.value),
+        refresh_rate: (lib.values.refresh_rate || []).map(v => v.value),
+        screen_type: (lib.values.screen_type || []).map(v => v.value),
+        keyboard_backlight: (lib.values.keyboard_backlight || []).map(v => v.value),
+        keyboard_layout: (lib.values.keyboard_layout || []).map(v => v.value),
       };
     }
     return { brand: uniq(laptops.map(l => l.brand)), series: seriesFromData, cpu: uniq(laptops.map(l => l.cpu)), ram: uniq(laptops.map(l => l.ram)),
       gpu: uniq(laptops.map(l => l.gpu)), storage: uniq(laptops.map(l => l.storage)), color: uniq(laptops.map(l => l.color)),
-      screen: uniq(laptops.map(l => l.screen)) };
+      screen: uniq(laptops.map(l => l.screen)),
+      refresh_rate: uniq(laptops.map(l => l.refresh_rate)), screen_type: uniq(laptops.map(l => l.screen_type)),
+      keyboard_backlight: uniq(laptops.map(l => l.keyboard_backlight)), keyboard_layout: uniq(laptops.map(l => l.keyboard_layout)) };
   }, [laptops, lib]);
 
   const seriesOpts = useMemo(() => {
@@ -271,6 +279,14 @@ export default function Warehouse() {
             <datalist id="color-list">{opts.color.map(v => <option key={v} value={v} />)}</datalist>
             <input className="inp" placeholder={tt("Экран")} list="screen-list" value={form.screen} onChange={e => setForm(f => ({ ...f, screen: e.target.value }))} />
             <datalist id="screen-list">{opts.screen.map(v => <option key={v} value={v} />)}</datalist>
+            <input className="inp" placeholder={tt("Частота экрана")} list="refresh-rate-list" value={form.refresh_rate} onChange={e => setForm(f => ({ ...f, refresh_rate: e.target.value }))} />
+            <datalist id="refresh-rate-list">{opts.refresh_rate.map(v => <option key={v} value={v} />)}</datalist>
+            <input className="inp" placeholder={tt("Тип экрана")} list="screen-type-list" value={form.screen_type} onChange={e => setForm(f => ({ ...f, screen_type: e.target.value }))} />
+            <datalist id="screen-type-list">{opts.screen_type.map(v => <option key={v} value={v} />)}</datalist>
+            <input className="inp" placeholder={tt("Подсветка клавиатуры")} list="kb-backlight-list" value={form.keyboard_backlight} onChange={e => setForm(f => ({ ...f, keyboard_backlight: e.target.value }))} />
+            <datalist id="kb-backlight-list">{opts.keyboard_backlight.map(v => <option key={v} value={v} />)}</datalist>
+            <input className="inp" placeholder={tt("Раскладка клавиатуры")} list="kb-layout-list" value={form.keyboard_layout} onChange={e => setForm(f => ({ ...f, keyboard_layout: e.target.value }))} />
+            <datalist id="kb-layout-list">{opts.keyboard_layout.map(v => <option key={v} value={v} />)}</datalist>
             <select className="inp" value={form.touch} onChange={e => setForm(f => ({ ...f, touch: e.target.value }))}>
               <option value="no">{tt("Сенсор")}: {tt("Нет")}</option><option value="yes">{tt("Сенсор")}: {tt("Да")}</option>
             </select>
@@ -346,6 +362,7 @@ export default function Warehouse() {
                 <th className="pb-2">{tt("Видеокарта")}</th>
                 <th className="pb-2">{tt("Экран")}</th>
                 <th className="pb-2">{tt("Цвет")}</th>
+                <th className="pb-2">{tt("Сенсор")}</th>
                 <th className="pb-2">{tt("Статус")}</th>
                 {th('stock', t('inStock'))}
                 <th className="pb-2">{tt("Цена")} ¥</th>
@@ -372,7 +389,7 @@ export default function Warehouse() {
                   <>
                     {showDivider && (
                       <tr key={`divider-${l.id}`}>
-                        <td colSpan={14} className="py-2 pl-4 text-[10px] uppercase text-text3 font-bold border-b border-border">
+                        <td colSpan={15} className="py-2 pl-4 text-[10px] uppercase text-text3 font-bold border-b border-border">
                           ⬇️ {tt('Нет в наличии / архив')}
                         </td>
                       </tr>
@@ -393,6 +410,7 @@ export default function Warehouse() {
                       <td className="py-2 text-xs text-text3">{tr('gpu', l.gpu) || '—'}</td>
                       <td className="py-2 text-xs text-text3">{tr('screen', l.screen) || '—'}</td>
                       <td className="py-2 text-xs text-text3">{tr('color', l.color) || '—'}</td>
+                      <td className="py-2 text-xs text-text3">{l.touch === 'yes' ? tt('Да') : tt('Нет')}</td>
                       <td className="py-2">
                         <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
                         {l.is_archived && canEdit && (
@@ -419,7 +437,7 @@ export default function Warehouse() {
                   </>
                 );
               })}
-              {!filtered.length && <tr><td colSpan={14} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
+              {!filtered.length && <tr><td colSpan={15} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
             </tbody>
           </table>
         </div>

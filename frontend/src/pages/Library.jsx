@@ -8,6 +8,8 @@ import { useTT } from '../i18n/useTT';
 const CATS = [
   ['cpu', 'processors'], ['gpu', 'gpus'], ['ram', 'rams'],
   ['storage', 'storages'], ['color', 'colors'], ['screen', 'screens'],
+  ['refresh_rate', 'refreshRates'], ['screen_type', 'screenTypes'],
+  ['keyboard_backlight', 'keyboardBacklights'], ['keyboard_layout', 'keyboardLayouts'],
 ];
 
 // Инлайн-редактируемое поле — сохраняет по потере фокуса/Enter. w-full — растягивается на всю

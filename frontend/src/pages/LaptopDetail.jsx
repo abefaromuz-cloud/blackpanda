@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Ruler, Cpu, MemoryStick, HardDrive, Gamepad2, Palette, Hand, Package, DollarSign, Tag, Eye, EyeOff } from 'lucide-react';
+import { Ruler, Cpu, MemoryStick, HardDrive, Gamepad2, Palette, Hand, Package, DollarSign, Tag, Eye, EyeOff, Zap, Monitor, Lightbulb, Keyboard } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
@@ -23,6 +23,10 @@ const SPEC_ICONS = {
   stock: [Package, 'bg-yellow/15 text-yellow'],
   price: [Tag, 'bg-green/15 text-green'],
   cost: [DollarSign, 'bg-accent/15 text-accent2'],
+  refresh_rate: [Zap, 'bg-accent/15 text-accent2'],
+  screen_type: [Monitor, 'bg-accent/15 text-accent2'],
+  keyboard_backlight: [Lightbulb, 'bg-yellow/15 text-yellow'],
+  keyboard_layout: [Keyboard, 'bg-blue-500/15 text-blue-400'],
 };
 
 function SpecBox({ Icon, iconClass, label, value }) {
@@ -295,6 +299,14 @@ export default function LaptopDetail() {
             <datalist id="edit-color-list">{(lib?.values?.color || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
             <input className="inp" placeholder={tt("Экран")} list="edit-screen-list" value={editForm.screen} onChange={e => setEditForm(f => ({ ...f, screen: e.target.value }))} />
             <datalist id="edit-screen-list">{(lib?.values?.screen || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder={tt("Частота экрана")} list="edit-refresh-rate-list" value={editForm.refresh_rate || ''} onChange={e => setEditForm(f => ({ ...f, refresh_rate: e.target.value }))} />
+            <datalist id="edit-refresh-rate-list">{(lib?.values?.refresh_rate || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder={tt("Тип экрана")} list="edit-screen-type-list" value={editForm.screen_type || ''} onChange={e => setEditForm(f => ({ ...f, screen_type: e.target.value }))} />
+            <datalist id="edit-screen-type-list">{(lib?.values?.screen_type || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder={tt("Подсветка клавиатуры")} list="edit-kb-backlight-list" value={editForm.keyboard_backlight || ''} onChange={e => setEditForm(f => ({ ...f, keyboard_backlight: e.target.value }))} />
+            <datalist id="edit-kb-backlight-list">{(lib?.values?.keyboard_backlight || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
+            <input className="inp" placeholder={tt("Раскладка клавиатуры")} list="edit-kb-layout-list" value={editForm.keyboard_layout || ''} onChange={e => setEditForm(f => ({ ...f, keyboard_layout: e.target.value }))} />
+            <datalist id="edit-kb-layout-list">{(lib?.values?.keyboard_layout || []).map(v => <option key={v.id} value={v.value} />)}</datalist>
             <select className="inp" value={editForm.touch} onChange={e => setEditForm(f => ({ ...f, touch: e.target.value }))}>
               <option value="no">{tt("Сенсор")}: {tt("Нет")}</option><option value="yes">{tt("Сенсор")}: {tt("Да")}</option>
             </select>
@@ -339,6 +351,10 @@ export default function LaptopDetail() {
           </div>
           <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-3">
             <SpecBox Icon={SPEC_ICONS.screen[0]} iconClass={SPEC_ICONS.screen[1]} label={tt("Диагональ")} value={tr('screen', l.screen)} />
+            {l.refresh_rate && <SpecBox Icon={SPEC_ICONS.refresh_rate[0]} iconClass={SPEC_ICONS.refresh_rate[1]} label={tt("Частота экрана")} value={tr('refresh_rate', l.refresh_rate)} />}
+            {l.screen_type && <SpecBox Icon={SPEC_ICONS.screen_type[0]} iconClass={SPEC_ICONS.screen_type[1]} label={tt("Тип экрана")} value={tr('screen_type', l.screen_type)} />}
+            {l.keyboard_backlight && <SpecBox Icon={SPEC_ICONS.keyboard_backlight[0]} iconClass={SPEC_ICONS.keyboard_backlight[1]} label={tt("Подсветка клавиатуры")} value={tr('keyboard_backlight', l.keyboard_backlight)} />}
+            {l.keyboard_layout && <SpecBox Icon={SPEC_ICONS.keyboard_layout[0]} iconClass={SPEC_ICONS.keyboard_layout[1]} label={tt("Раскладка клавиатуры")} value={tr('keyboard_layout', l.keyboard_layout)} />}
             <SpecBox Icon={SPEC_ICONS.cpu[0]} iconClass={SPEC_ICONS.cpu[1]} label="CPU" value={tr('cpu', l.cpu)} />
             <SpecBox Icon={SPEC_ICONS.ram[0]} iconClass={SPEC_ICONS.ram[1]} label="RAM" value={tr('ram', l.ram)} />
             <SpecBox Icon={SPEC_ICONS.storage[0]} iconClass={SPEC_ICONS.storage[1]} label={tt("Накопитель")} value={tr('storage', l.storage)} />
