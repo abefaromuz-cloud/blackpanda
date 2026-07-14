@@ -18,6 +18,9 @@ export default function Header() {
   const [rate, setRate] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifData, setNotifData] = useState({ lowStock: [], debts: [] });
+  const [dismissed, setDismissed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bp_dismissed_notifs') || '[]'); } catch { return []; }
+  });
   const boxRef = useRef(null);
 
   useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
@@ -47,8 +50,23 @@ export default function Header() {
     setShowResults(false); setQuery(''); navigate(path);
   }
 
-  const notifCount = notifData.lowStock.length + notifData.debts.length;
   const hasResults = results && (results.serials.length || results.laptops.length || results.clients.length);
+
+  // Сигнатура = "что именно" + "какое сейчас значение". Если товара стало ещё меньше или долг
+  // вырос — сигнатура изменится, и уведомление снова покажется как новое, даже если старое
+  // уже было очищено.
+  function lowStockSig(l) { return `stock:${l.id}:${l.in_stock}`; }
+  function debtSig(c) { return `debt:${c.id}:${Math.round(c.debt_rub)}`; }
+  const visibleLowStock = notifData.lowStock.filter(l => !dismissed.includes(lowStockSig(l)));
+  const visibleDebts = notifData.debts.filter(c => !dismissed.includes(debtSig(c)));
+  const visibleCount = visibleLowStock.length + visibleDebts.length;
+
+  function clearAllNotifs() {
+    const allSigs = [...notifData.lowStock.map(lowStockSig), ...notifData.debts.map(debtSig)];
+    const next = [...new Set([...dismissed, ...allSigs])];
+    setDismissed(next);
+    localStorage.setItem('bp_dismissed_notifs', JSON.stringify(next));
+  }
 
   return (
     <div className="hidden lg:flex items-center gap-3 px-6 py-3 border-b border-border bg-bg2">
@@ -111,25 +129,30 @@ export default function Header() {
         <div className="relative">
           <button onClick={() => setNotifOpen(o => !o)} className="relative w-9 h-9 rounded-xl bg-bg3 border border-border flex items-center justify-center text-text2 hover:text-text">
             <Bell size={16} />
-            {notifCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-accent text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">{notifCount}</span>}
+            {visibleCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-accent text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">{visibleCount}</span>}
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-full mt-2 w-72 card p-3 z-50 max-h-80 overflow-y-auto">
-              {notifCount === 0 && <div className="text-text3 text-xs">{tt("Нет уведомлений")}</div>}
-              {notifData.lowStock.length > 0 && (
+              {visibleCount === 0 && <div className="text-text3 text-xs">{tt("Нет уведомлений")}</div>}
+              {visibleCount > 0 && (
+                <button onClick={clearAllNotifs} className="w-full text-center text-[10px] text-text3 hover:text-text border border-border rounded-lg py-1 mb-2">
+                  ✕ {tt("Очистить всё")}
+                </button>
+              )}
+              {visibleLowStock.length > 0 && (
                 <div className="mb-2">
                   <div className="text-[10px] text-yellow uppercase font-bold mb-1">⚠️ {tt("Заканчивается на складе")}</div>
-                  {notifData.lowStock.map(l => (
+                  {visibleLowStock.map(l => (
                     <button key={l.id} onClick={() => { setNotifOpen(false); navigate(`/warehouse/${l.id}`); }} className="w-full text-left text-xs py-1 hover:text-accent2">
                       {l.brand} {l.series} — {l.in_stock} {tt("шт.")}
                     </button>
                   ))}
                 </div>
               )}
-              {notifData.debts.length > 0 && (
+              {visibleDebts.length > 0 && (
                 <div>
                   <div className="text-[10px] text-red uppercase font-bold mb-1">💰 {tt("Должники")}</div>
-                  {notifData.debts.map(c => (
+                  {visibleDebts.map(c => (
                     <button key={c.id} onClick={() => { setNotifOpen(false); navigate(`/clients/${c.id}`); }} className="w-full text-left text-xs py-1 hover:text-accent2 flex justify-between">
                       <span>{c.name}</span><span className="font-mono text-red">{Math.round(c.debt_rub).toLocaleString('ru-RU')} ₽</span>
                     </button>

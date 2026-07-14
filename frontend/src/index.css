@@ -41,6 +41,13 @@ h1, h2, h3, .font-black { font-family: 'Space Grotesk', 'Inter', sans-serif; }
   /* iOS Safari игнорирует заданную ширину у нативного календаря (input type="date") при длинной
      локализованной дате ("12 июля 2026 г.") — из-за этого поле вылезало за рамку карточки. */
   input[type="date"].inp { -webkit-appearance: none; appearance: none; min-width: 0; }
+  /* Поле серийника в Сканере — на мобильном шрифт должен быть не меньше 16px, иначе iOS Safari
+     сам зумит всю страницу при фокусе на поле (жёсткое правило Safari). На ПК (≥1024px) —
+     оставляем как было (обычный размер .inp), там масштаб не проблема. */
+  #scan-serial-input.inp { font-size: 16px; }
+  @media (min-width: 1024px) {
+    #scan-serial-input.inp { font-size: 0.875rem; }
+  }
   .inp-sm { @apply px-2 py-1 text-xs; }
   .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold; }
   .badge-blue { @apply bg-accent/15 text-accent2; }

@@ -25,7 +25,7 @@ export default function Warehouse() {
   const [aiError, setAiError] = useState('');
   const [search, setSearch] = useState('');
   const [serialMatches, setSerialMatches] = useState([]);
-  const [filters, setFilters] = useState({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' });
+  const [filters, setFilters] = useState({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '' });
   const [sort, setSort] = useState({ col: 'brand', dir: 1 });
   const { can } = useAuth();
   const { badgeClass } = useStatuses();
@@ -96,12 +96,6 @@ export default function Warehouse() {
 
   async function releaseReservation(id) {
     await api.delete(`/reservations/${id}`);
-    load();
-  }
-
-  async function remove(id) {
-    if (!confirm(tt('Удалить модель?'))) return;
-    await api.delete(`/laptops/${id}`);
     load();
   }
 
@@ -180,8 +174,6 @@ export default function Warehouse() {
       if (filters.touch && l.touch !== filters.touch) return false;
       if (filters.hot === 'yes' && !l.is_hot) return false;
       if (filters.hot === 'no' && l.is_hot) return false;
-      if (filters.status === 'instock' && Number(l.in_stock) === 0) return false;
-      if (filters.status === 'empty' && Number(l.in_stock) > 0) return false;
       return true;
     });
     list.sort((a, b) => {
@@ -330,11 +322,8 @@ export default function Warehouse() {
         <select className="inp text-xs" value={filters.hot} onChange={e => setFilters(f => ({ ...f, hot: e.target.value }))}>
           <option value="">🔥 {tt("Хит")}</option><option value="yes">{tt("Да")}</option><option value="no">{tt("Нет")}</option>
         </select>
-        <select className="inp text-xs" value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}>
-          <option value="">{tt("Статус")}</option><option value="instock">{tt("Есть")}</option><option value="empty">{tt("Нет")}</option>
-        </select>
         {Object.values(filters).some(v => v) && (
-          <button className="btn btn-danger btn-sm text-xs" onClick={() => setFilters({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '', status: '' })}>✕ {tt('Сбросить')}</button>
+          <button className="btn btn-danger btn-sm text-xs" onClick={() => setFilters({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '' })}>✕ {tt('Сбросить')}</button>
         )}
       </div>
 
@@ -355,8 +344,7 @@ export default function Warehouse() {
                 {th('stock', t('inStock'))}
                 <th className="pb-2">{tt("Цена")} ¥</th>
                 <th className="pb-2">{tt("Курс")}</th>
-                <th className="pb-2">{tt("Цена")} ₽</th>
-                <th className="pb-2 pr-4"></th>
+                <th className="pb-2 pr-4">{tt("Цена")} ₽</th>
               </tr>
             </thead>
             <tbody>
@@ -403,10 +391,7 @@ export default function Warehouse() {
                       </div>
                     </td>
                     <td className="py-2 text-xs text-text3 font-mono">{rate}</td>
-                    <td className="py-2 text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
-                    <td className="py-2 pr-4 text-right">
-                      {canEdit && <button className="text-text3 hover:text-red text-xs" onClick={() => remove(l.id)}>✕</button>}
-                    </td>
+                    <td className="py-2 pr-4 text-xs text-text3 font-mono">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
                   </tr>
                 );
               })}

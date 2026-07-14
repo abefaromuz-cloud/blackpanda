@@ -4,12 +4,15 @@ import { useLang } from '../i18n/LangContext';
 import { roleLabels, pageLabels } from '../i18n/translations';
 import DragReorderList from '../components/DragReorderList';
 import { useTT } from '../i18n/useTT';
+import Settings from './Settings';
+import ActivityLog from './ActivityLog';
+import Import from './Import';
 
 const ROLES = ['admin', 'staff', 'accountant', 'client'];
 const PAGES = ['dashboard', 'warehouse', 'clients', 'preorders', 'sales', 'cash', 'settings', 'admin', 'client_portal',
   'finance', 'analytics', 'reports', 'import', 'employees', 'activity_log', 'scan', 'broadcast', 'library', 'arrivals', 'service'];
 const NAV_PAGES = ['dashboard', 'scan', 'warehouse', 'library', 'clients', 'preorders', 'sales',
-  'finance', 'analytics', 'reports', 'broadcast', 'import', 'activity_log', 'settings', 'arrivals', 'service'];
+  'finance', 'analytics', 'reports', 'broadcast', 'arrivals', 'service'];
 
 export default function Admin() {
   const { t, lang } = useLang();
@@ -23,9 +26,18 @@ export default function Admin() {
         <button onClick={() => setTab('users')} className={`btn ${tab === 'users' ? 'btn-primary' : 'btn-secondary'}`}>{t('users')}</button>
         <button onClick={() => setTab('permissions')} className={`btn ${tab === 'permissions' ? 'btn-primary' : 'btn-secondary'}`}>{t('permissions')}</button>
         <button onClick={() => setTab('navorder')} className={`btn ${tab === 'navorder' ? 'btn-primary' : 'btn-secondary'}`}>{t('menuOrder')}</button>
+        <button onClick={() => setTab('settings')} className={`btn ${tab === 'settings' ? 'btn-primary' : 'btn-secondary'}`}>{t('settings')}</button>
+        <button onClick={() => setTab('activityLog')} className={`btn ${tab === 'activityLog' ? 'btn-primary' : 'btn-secondary'}`}>{t('activityLog')}</button>
+        <button onClick={() => setTab('import')} className={`btn ${tab === 'import' ? 'btn-primary' : 'btn-secondary'}`}>{t('importPage')}</button>
         <button onClick={() => setTab('danger')} className={`btn ${tab === 'danger' ? 'btn-danger' : 'btn-secondary'}`}>⚠️ {tt('Опасная зона')}</button>
       </div>
-      {tab === 'users' ? <UsersTab /> : tab === 'permissions' ? <PermissionsTab /> : tab === 'navorder' ? <NavOrderTab /> : <DangerZoneTab />}
+      {tab === 'users' ? <UsersTab />
+        : tab === 'permissions' ? <PermissionsTab />
+        : tab === 'navorder' ? <NavOrderTab />
+        : tab === 'settings' ? <Settings />
+        : tab === 'activityLog' ? <ActivityLog />
+        : tab === 'import' ? <Import />
+        : <DangerZoneTab />}
     </div>
   );
 }

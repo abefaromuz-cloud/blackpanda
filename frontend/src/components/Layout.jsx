@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, ScanLine, Warehouse, PackagePlus, Library, Users,
   ClipboardList, ShoppingCart, Wrench, Wallet, BarChart3, FileText,
-  Megaphone, Upload, History, Settings, ShieldCheck, Menu, X, MoreHorizontal,
+  Megaphone, ShieldCheck, Menu, X, MoreHorizontal,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
@@ -25,9 +25,6 @@ const navItems = [
   { to: '/analytics', key: 'analytics', page: 'analytics', Icon: BarChart3 },
   { to: '/reports',   key: 'reports',   page: 'reports',   Icon: FileText },
   { to: '/broadcast', key: 'broadcast', page: 'broadcast', Icon: Megaphone },
-  { to: '/import',    key: 'importPage',page: 'import',    Icon: Upload },
-  { to: '/activity-log', key: 'activityLog', page: 'activity_log', Icon: History },
-  { to: '/settings',  key: 'settings',  page: 'settings',  Icon: Settings },
 ];
 
 // Нижняя навигация на мобильном (как в старой версии системы) — 4 самых частых раздела + "Ещё"
@@ -45,6 +42,8 @@ export default function Layout() {
   const { t, lang, setLang } = useLang();
   const [order, setOrder] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileRate, setMobileRate] = useState(null);
+  useEffect(() => { api.get('/settings/public-rate').then(r => setMobileRate(r.data.rate)); }, []);
   const [theme, setTheme] = useState(() => localStorage.getItem('bp_theme') || 'dark');
 
   useEffect(() => {
@@ -78,6 +77,11 @@ export default function Layout() {
         </button>
         <img src="/logo.png" alt="" className="h-8 w-auto object-contain" />
         <span className="font-black text-sm">BlackPanda</span>
+        {mobileRate !== null && (
+          <span className="ml-auto flex items-center gap-1 bg-bg3 border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold flex-shrink-0">
+            💱 ¥1={mobileRate}₽
+          </span>
+        )}
       </div>
 
       {/* Затемнение фона при открытом мобильном меню */}

@@ -16,6 +16,7 @@ export default function ClientDetail() {
   const [rate, setRate] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState('');
+  const [payAmounts, setPayAmounts] = useState({});
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [managers, setManagers] = useState([]);
@@ -55,24 +56,22 @@ export default function ClientDetail() {
     load();
   }
 
-  async function payOneDebt(debt) {
+  async function payOneDebt(debt, amountInput) {
     if (debt.amount_cny) {
       const remainingCny = Number(debt.amount_cny) - Number(debt.amount_paid_cny);
       const remainingRub = Math.round(remainingCny * rate);
-      const input = prompt(`${tt('Сумма к погашению в рублях (по текущему курсу')} ¥1=${rate}₽, ${tt('максимум')} ${remainingRub.toLocaleString('ru-RU')} ₽):`, remainingRub);
-      if (input === null) return;
-      const amount = Number(input);
+      const amount = amountInput ? Number(amountInput) : remainingRub;
       if (!amount || amount <= 0) return;
-      await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: amount });
+      await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: Math.min(amount, remainingRub) });
+      setPayAmounts(a => ({ ...a, [debt.id]: '' }));
       load();
       return;
     }
     const remaining = Number(debt.amount_rub) - Number(debt.amount_paid_rub);
-    const input = prompt(`Сумма к погашению (максимум ${Math.round(remaining).toLocaleString('ru-RU')} ₽):`, Math.round(remaining));
-    if (input === null) return;
-    const amount = Number(input);
+    const amount = amountInput ? Number(amountInput) : remaining;
     if (!amount || amount <= 0) return;
-    await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: amount });
+    await api.post(`/clients/${id}/debts/${debt.id}/pay`, { amount_rub: Math.min(amount, remaining) });
+    setPayAmounts(a => ({ ...a, [debt.id]: '' }));
     load();
   }
 
@@ -216,28 +215,48 @@ export default function ClientDetail() {
           </div>
           {totalDebt > 0 && canEdit && <button className="btn btn-primary mt-3" onClick={payOff}>✅ {t('payOffDebt')} ({tt('все')})</button>}
           {openDebts.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {openDebts.map(d => (
-                <div key={d.id} className="flex justify-between items-center text-xs border-t border-border pt-2">
-                  <span>{new Date(d.created_at).toLocaleDateString('ru-RU')} {d.due_date && `· ${tt("до")} ${new Date(d.due_date).toLocaleDateString('ru-RU')}`}</span>
-                  <span className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="mt-3 space-y-2">
+              {openDebts.map(d => {
+                const remainingRub = d.amount_cny
+                  ? Math.round((Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate)
+                  : Math.round(Number(d.amount_rub) - Number(d.amount_paid_rub));
+                return (
+                  <div key={d.id} className="border-t border-border pt-2">
+                    <div className="flex justify-between items-center text-xs mb-1.5">
+                      <span className="text-text3">{new Date(d.created_at).toLocaleDateString('ru-RU')} {d.due_date && `· ${tt("до")} ${new Date(d.due_date).toLocaleDateString('ru-RU')}`}</span>
+                      <span className="flex items-center gap-2">
+                        {canEdit && <button className="text-text3 hover:text-text" onClick={() => editDebt(d)}>✏️</button>}
+                        {c.telegram && <button className="text-accent2 hover:underline" onClick={() => remind(d.id)}>✈️ {t('remindDebt')}</button>}
+                      </span>
+                    </div>
                     {d.amount_cny ? (
-                      <span>
-                        <span className="block text-[9px] text-text3 uppercase font-bold text-right">{tt('Долг в юанях ≈ рублей')}</span>
-                        <b className="text-red">¥{(Number(d.amount_cny) - Number(d.amount_paid_cny)).toLocaleString('ru-RU')} ≈ {Math.round((Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate).toLocaleString('ru-RU')} ₽</b>
-                      </span>
+                      <div className="mb-1.5">
+                        <span className="block text-[9px] text-text3 uppercase font-bold">{tt('Долг в юанях ≈ рублей')}</span>
+                        <b className="text-red">¥{(Number(d.amount_cny) - Number(d.amount_paid_cny)).toLocaleString('ru-RU')} ≈ {remainingRub.toLocaleString('ru-RU')} ₽</b>
+                      </div>
                     ) : (
-                      <span>
-                        <span className="block text-[9px] text-text3 uppercase font-bold text-right">{tt('Долг в рублях')}</span>
-                        <b className="text-red">{Math.round(Number(d.amount_rub) - Number(d.amount_paid_rub)).toLocaleString('ru-RU')} ₽</b>
-                      </span>
+                      <div className="mb-1.5">
+                        <span className="block text-[9px] text-text3 uppercase font-bold">{tt('Долг в рублях')}</span>
+                        <b className="text-red">{remainingRub.toLocaleString('ru-RU')} ₽</b>
+                      </div>
                     )}
-                    {canEdit && <button className="text-green hover:underline" onClick={() => payOneDebt(d)}>✓ {tt('Погасить')}</button>}
-                    {canEdit && <button className="text-text3 hover:text-text" onClick={() => editDebt(d)}>✏️</button>}
-                    {c.telegram && <button className="text-accent2 hover:underline" onClick={() => remind(d.id)}>✈️ {t('remindDebt')}</button>}
-                  </span>
-                </div>
-              ))}
+                    {canEdit && (
+                      <div className="flex gap-2">
+                        <input
+                          className="inp inp-sm flex-1" type="number" placeholder={`${tt('Сумма, ₽ (максимум')} ${remainingRub.toLocaleString('ru-RU')})`}
+                          value={payAmounts[d.id] || ''} onChange={e => setPayAmounts(a => ({ ...a, [d.id]: e.target.value }))}
+                        />
+                        <button className="btn btn-secondary btn-sm" onClick={() => payOneDebt(d, payAmounts[d.id])} disabled={!payAmounts[d.id]}>
+                          {tt('Внести часть')}
+                        </button>
+                        <button className="btn btn-primary btn-sm" onClick={() => payOneDebt(d, null)}>
+                          {tt('Погасить полностью')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

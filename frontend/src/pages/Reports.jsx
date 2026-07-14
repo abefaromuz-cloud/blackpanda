@@ -17,8 +17,8 @@ export default function Reports() {
       <div className="text-xs text-text3 mb-6">{tt('Реестры для бухгалтерии — по каждой единице товара отдельной строкой, с курсом на момент операции')}</div>
 
       <div className="card mb-5 flex gap-2 flex-wrap items-end">
-        <div><label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('from')}</label><input className="inp" type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
-        <div><label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('to')}</label><input className="inp" type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
+        <div className="min-w-[150px]"><label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('from')}</label><input className="inp" type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
+        <div className="min-w-[150px]"><label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('to')}</label><input className="inp" type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
         <div className="text-[11px] text-text3">{tt('Общий период для всех реестров ниже — оставь пустым для «за всё время»')}</div>
       </div>
 

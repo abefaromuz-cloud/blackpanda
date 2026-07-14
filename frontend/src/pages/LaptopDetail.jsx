@@ -42,6 +42,9 @@ export default function LaptopDetail() {
   const navigate = useNavigate();
   const [l, setL] = useState(null);
   const [showMerge, setShowMerge] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
   const [mergeTarget, setMergeTarget] = useState(null);
   const [mergeCandidates, setMergeCandidates] = useState([]);
@@ -91,6 +94,22 @@ export default function LaptopDetail() {
     } catch (e2) {
       alert(e2.response?.data?.error || 'Ошибка объединения');
       setMerging(false);
+    }
+  }
+
+  async function confirmDelete() {
+    const expected = `${l.brand} ${l.series || ''}`.trim();
+    if (deleteConfirmText.trim() !== expected) {
+      alert(`${tt('Название введено неточно. Нужно ввести ровно')}: ${expected}`);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.delete(`/laptops/${id}`);
+      navigate('/warehouse');
+    } catch (e2) {
+      alert(e2.response?.data?.error || 'Ошибка удаления');
+      setDeleting(false);
     }
   }
 
@@ -200,6 +219,7 @@ export default function LaptopDetail() {
           {l.mfr_item_code && <span className="badge badge-purple font-mono">ITEM: {l.mfr_item_code}</span>}
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
           {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMerge(s => !s)}>🔗 {tt("Объединить дубль")}</button>}
+          {canEdit && <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(s => !s)}>🗑️ {tt("Удалить модель")}</button>}
         </div>
       </div>
 
@@ -227,6 +247,25 @@ export default function LaptopDetail() {
               <button className="text-text3 text-xs hover:text-text" onClick={() => { setMergeTarget(null); setMergeSearch(''); }}>{t('cancel')}</button>
             </div>
           )}
+        </div>
+      )}
+
+      {showDelete && (
+        <div className="card mb-5 border border-red/50">
+          <div className="font-bold text-sm mb-1 text-red">🗑️ {tt("Удалить эту модель насовсем?")}</div>
+          <div className="text-xs text-text3 mb-3">
+            {tt("Модель")} «{l.brand} {l.series || ''}» {tt("и все её серийники исчезнут из активного склада. История уже прошедших продаж по этой модели сохранится и не потеряется — удаление затрагивает только карточку и остаток на складе.")}
+          </div>
+          <div className="text-xs text-text2 mb-2">
+            {tt("Чтобы подтвердить, введи название модели точно так же, как оно указано выше")}: <b>{l.brand} {l.series || ''}</b>
+          </div>
+          <input className="inp mb-3" placeholder={`${l.brand} ${l.series || ''}`} value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <button className="btn btn-danger btn-sm" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? tt('Удаляю...') : `🗑️ ${tt('Удалить насовсем')}`}
+            </button>
+            <button className="text-text3 text-xs hover:text-text" onClick={() => { setShowDelete(false); setDeleteConfirmText(''); }}>{t('cancel')}</button>
+          </div>
         </div>
       )}
 
@@ -284,12 +323,12 @@ export default function LaptopDetail() {
           <div className="card md:col-span-1">
             {images.length ? (
               <div>
-                <img src={images[activeImg]} className="w-full h-44 object-contain bg-bg3 rounded-lg mb-2" alt="" />
+                <img src={images[activeImg]} className="w-full aspect-square object-cover bg-bg3 rounded-lg mb-2" alt="" />
                 {images.length > 1 && (
                   <div className="flex gap-2 flex-wrap">
                     {images.map((u, i) => (
                       <button key={i} onClick={() => setActiveImg(i)} className={`w-14 h-14 rounded-lg overflow-hidden border-2 ${activeImg === i ? 'border-accent' : 'border-transparent'}`}>
-                        <img src={u} className="w-full h-full object-contain bg-bg3" alt="" />
+                        <img src={u} className="w-full h-full object-cover bg-bg3" alt="" />
                       </button>
                     ))}
                   </div>

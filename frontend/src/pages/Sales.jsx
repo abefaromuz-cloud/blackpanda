@@ -149,11 +149,11 @@ export default function Sales() {
       </div>
 
       <div className="card mb-4 flex flex-wrap gap-2 items-end">
-        <div>
+        <div className="min-w-[150px]">
           <label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('date')} {tt('от')}</label>
           <input className="inp" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         </div>
-        <div>
+        <div className="min-w-[150px]">
           <label className="block text-[11px] text-text2 font-bold uppercase mb-1">{t('date')} {tt('до')}</label>
           <input className="inp" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>

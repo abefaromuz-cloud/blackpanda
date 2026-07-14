@@ -72,7 +72,6 @@ export default function Dashboard() {
       {can('warehouse', 'edit') && (
         <div className="flex gap-2 flex-wrap mb-5">
           <Link to="/scan" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">🔍</span><div><div className="text-xs font-bold">{tt("Быстрый поиск")}</div><div className="text-[10px] text-text3">{tt("По серийному номеру")}</div></div></Link>
-          <Link to="/warehouse" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">➕</span><div><div className="text-xs font-bold">{tt("Добавить устройство")}</div><div className="text-[10px] text-text3">{tt("Внести новый товар")}</div></div></Link>
           <Link to="/clients" className="card flex items-center gap-2 py-2.5 px-4 hover:border-accent/50"><span className="text-lg">👤</span><div><div className="text-xs font-bold">{tt("Добавить клиента")}</div><div className="text-[10px] text-text3">{tt("Новый клиент в базу")}</div></div></Link>
         </div>
       )}

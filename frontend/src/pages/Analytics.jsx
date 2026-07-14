@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { Wallet, TrendingUp, ShoppingCart, Package, Users, Sparkles } from 'lucide-react';
+import { Wallet, TrendingUp, ShoppingCart, Package, Users, Sparkles, Folder } from 'lucide-react';
 import api from '../api/client';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
@@ -131,11 +131,12 @@ export default function Analytics() {
       </div>
 
       {/* Верхние показатели */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         <StatMini icon={<Wallet size={18} />} cls="bg-accent/15 text-accent2" label={tt('Оборот')} value={money(d.stats.revenue)} change={d.stats.revenue.change_pct} />
         <StatMini icon={<TrendingUp size={18} />} cls="bg-green/15 text-green" label={tt('Чистая прибыль')} value={money(d.stats.profit)} change={d.stats.profit.change_pct} />
         <StatMini icon={<ShoppingCart size={18} />} cls="bg-blue-500/15 text-blue-400" label={tt('Продано ноутбуков')} value={d.stats.sold_qty.value + ' ' + tt('шт.')} change={d.stats.sold_qty.change_pct} />
         <StatMini icon={<Package size={18} />} cls="bg-yellow/15 text-yellow" label={tt('Остаток на складе')} value={d.stats.stock_now.value + ' ' + tt('шт.')} />
+        <StatMini icon={<Folder size={18} />} cls="bg-blue-500/15 text-blue-400" label={tt('Моделей на складе')} value={d.stats.models_now.value} />
         <StatMini icon={<Users size={18} />} cls="bg-purple/15 text-purple" label={tt('Новые клиенты')} value={d.stats.new_clients.value} change={d.stats.new_clients.change_pct} />
       </div>
 

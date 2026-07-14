@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
@@ -8,6 +8,13 @@ import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
 
 export default function Scan() {
+  const scanInputRef = useRef(null);
+  // Автофокус — только на ПК (≥1024px). На мобильном не фокусируем сами, чтобы не выскакивала
+  // клавиатура и не зумило страницу сразу при входе в раздел — неудобно, если человек ещё
+  // просто хочет осмотреться.
+  useEffect(() => {
+    if (window.innerWidth >= 1024 && scanInputRef.current) scanInputRef.current.focus();
+  }, []);
   const { t } = useLang();
   const tt = useTT();
   const [step, setStep] = useState(1);
@@ -183,7 +190,7 @@ export default function Scan() {
         {step === 1 && (
           <div>
             <form onSubmit={submitScan} className="flex gap-2 mb-3">
-              <input className="inp" autoFocus placeholder={t('scanSerialsPlaceholder')} value={scanInput} onChange={e => setScanInput(e.target.value)} />
+              <input id="scan-serial-input" ref={scanInputRef} className="inp" placeholder={t('scanSerialsPlaceholder')} value={scanInput} onChange={e => setScanInput(e.target.value)} />
               <button type="button" className="btn btn-secondary" onClick={() => setShowCamera(true)}>📷</button>
               <button className="btn btn-primary">+</button>
             </form>
