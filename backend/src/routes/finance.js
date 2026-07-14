@@ -29,18 +29,17 @@ router.get('/', authenticate, requirePermission('finance', 'view'), async (req, 
           COALESCE((SELECT SUM(si.price_cost_cny*si.qty * st.rate) FROM sale_items si CROSS JOIN (SELECT rate FROM settings WHERE id=1) st),0) AS lifetime_cost_rub,
           COALESCE((SELECT SUM(amount_rub) FROM cash_log WHERE type='out' AND (category IS DISTINCT FROM 'exchanger')),0) AS lifetime_expenses_rub
       `),
-      // Должники — как и раньше на дашборде, юаневые долги пересчитываются по сегодняшнему курсу
+      // Должники — долг в юанях и долг в рублях у одного клиента показываем раздельно
       pool.query(`
-        SELECT c.id, c.name, COALESCE(SUM(
-          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
-          ELSE (d.amount_rub - d.amount_paid_rub) END
-        ),0) AS debt_rub
+        SELECT c.id, c.name,
+          COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) AS debt_rub,
+          COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) AS debt_cny
         FROM clients c JOIN debts d ON d.client_id = c.id AND d.status='open'
-        GROUP BY c.id, c.name HAVING SUM(
-          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
-          ELSE (d.amount_rub - d.amount_paid_rub) END
-        ) > 0
-        ORDER BY debt_rub DESC
+        GROUP BY c.id, c.name
+        HAVING COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) > 0
+            OR COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) > 0
+        ORDER BY (COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0)
+          + COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) * (SELECT rate FROM settings WHERE id=1)) DESC
       `),
       // Сколько всего передано каждому обменнику
       pool.query(`

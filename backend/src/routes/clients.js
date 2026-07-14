@@ -208,14 +208,16 @@ router.post('/:id/balance/reset', authenticate, requirePermission('clients', 'ed
 
 // Добавить долг клиенту вручную (не привязан к продаже) — используется в блоке "Операция" на Финансах
 router.post('/:id/debts', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
-  const { amount_rub, due_date, note } = req.body;
-  if (!amount_rub || Number(amount_rub) <= 0) return res.status(400).json({ error: 'Укажите сумму долга' });
+  const { amount_rub, amount_cny, due_date, note } = req.body;
+  const isCny = amount_cny && Number(amount_cny) > 0;
+  if (!isCny && (!amount_rub || Number(amount_rub) <= 0)) return res.status(400).json({ error: 'Укажите сумму долга' });
   try {
     const result = await pool.query(
-      'INSERT INTO debts (client_id, amount_rub, due_date) VALUES ($1,$2,$3) RETURNING *',
-      [req.params.id, amount_rub, due_date || null]
+      'INSERT INTO debts (client_id, amount_rub, amount_cny, due_date) VALUES ($1,$2,$3,$4) RETURNING *',
+      [req.params.id, isCny ? 0 : amount_rub, isCny ? amount_cny : null, due_date || null]
     );
-    await logActivity(req.user, 'Добавлен долг клиенту', 'debt', Math.round(amount_rub).toLocaleString('ru-RU') + ' ₽' + (note ? ' — ' + note : ''));
+    const label = isCny ? `¥${Number(amount_cny).toLocaleString('ru-RU')}` : `${Math.round(amount_rub).toLocaleString('ru-RU')} ₽`;
+    await logActivity(req.user, 'Добавлен долг клиенту', 'debt', label + (note ? ' — ' + note : ''));
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
@@ -330,13 +332,13 @@ router.post('/:id/debts/remind', authenticate, requirePermission('clients', 'edi
 });
 
 router.post('/', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
-  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id } = req.body;
+  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source } = req.body;
   if (!name) return res.status(400).json({ error: 'Укажите имя клиента' });
   try {
     const result = await pool.query(
-      `INSERT INTO clients (name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [name, phone||null, telegram||null, notes||null, category || 'retail', discount_percent || 0, city||null, avatar_url||null, manager_id||null]
+      `INSERT INTO clients (name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [name, phone||null, telegram||null, notes||null, category || 'retail', discount_percent || 0, city||null, avatar_url||null, manager_id||null, source||null]
     );
     await logActivity(req.user, 'Добавлен клиент', 'client', name);
     res.status(201).json(result.rows[0]);
@@ -344,14 +346,15 @@ router.post('/', authenticate, requirePermission('clients', 'edit'), async (req,
 });
 
 router.put('/:id', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
-  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id } = req.body;
+  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source } = req.body;
   try {
     const result = await pool.query(
       `UPDATE clients SET name=COALESCE($1,name), phone=COALESCE($2,phone), telegram=COALESCE($3,telegram),
        notes=COALESCE($4,notes), category=COALESCE($5,category), discount_percent=COALESCE($6,discount_percent),
-       city=COALESCE($7,city), avatar_url=COALESCE($8,avatar_url), manager_id=COALESCE($9,manager_id)
-       WHERE id=$10 RETURNING *`,
-      [name||null, phone||null, telegram||null, notes||null, category||null, discount_percent ?? null, city||null, avatar_url||null, manager_id||null, req.params.id]
+       city=COALESCE($7,city), avatar_url=COALESCE($8,avatar_url), manager_id=COALESCE($9,manager_id),
+       source=COALESCE($10,source)
+       WHERE id=$11 RETURNING *`,
+      [name||null, phone||null, telegram||null, notes||null, category||null, discount_percent ?? null, city||null, avatar_url||null, manager_id||null, source||null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Клиент не найден' });
     res.json(result.rows[0]);

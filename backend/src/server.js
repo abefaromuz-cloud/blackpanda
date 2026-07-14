@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { startCbrRateScheduler } = require('./utils/cbrRate');
+const { startWarrantyReminderScheduler } = require('./utils/warrantyReminder');
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,8 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin-danger', require('./routes/admin-danger'));
+app.use('/api/wishlist', require('./routes/wishlist'));
+app.use('/api/public', require('./routes/public'));
 app.use('/api/nav-order', require('./routes/navOrder'));
 
 // Раздача собранного фронтенда
@@ -53,4 +56,5 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`🐼 BlackPanda CRM запущен на порту ${PORT}`);
   startCbrRateScheduler(); // курс ЦБ РФ обновляется сам, без кнопок и захода в интерфейс
+  startWarrantyReminderScheduler(); // напоминания об окончании гарантии — раз в сутки
 });

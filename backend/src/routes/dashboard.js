@@ -26,20 +26,22 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
         WHERE l.is_archived=false
         GROUP BY l.id
         HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) <= l.low_stock_threshold
+        ORDER BY COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) ASC
+        LIMIT 5
       `),
       // Должники — берём из реальной таблицы долгов, а не устаревшего поля clients.debt_rub.
-      // Долги в юанях (amount_cny) пересчитываются по сегодняшнему курсу, а не по курсу на момент создания.
+      // Долг в юанях и долг в рублях у одного клиента — РАЗНЫЕ суммы, показываем отдельно
+      // (клиент мог купить один товар в долг по юаневой цене, а другой — просто занять в рублях).
       pool.query(`
-        SELECT c.id, c.name, COALESCE(SUM(
-          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
-          ELSE (d.amount_rub - d.amount_paid_rub) END
-        ),0) AS debt_rub
+        SELECT c.id, c.name,
+          COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) AS debt_rub,
+          COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) AS debt_cny
         FROM clients c JOIN debts d ON d.client_id = c.id AND d.status='open'
-        GROUP BY c.id, c.name HAVING SUM(
-          CASE WHEN d.amount_cny IS NOT NULL THEN (d.amount_cny - d.amount_paid_cny) * (SELECT rate FROM settings WHERE id=1)
-          ELSE (d.amount_rub - d.amount_paid_rub) END
-        ) > 0
-        ORDER BY debt_rub DESC
+        GROUP BY c.id, c.name
+        HAVING COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) > 0
+            OR COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) > 0
+        ORDER BY (COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0)
+          + COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) * (SELECT rate FROM settings WHERE id=1)) DESC
       `),
       pool.query(`
         SELECT to_char(date_trunc('month', s.created_at), 'YYYY-MM') AS month,

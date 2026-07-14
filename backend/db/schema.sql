@@ -981,3 +981,27 @@ INSERT INTO lib_values (category, value, value_zh) VALUES
   ('keyboard_backlight','Есть подсветка','有背光'),('keyboard_backlight','Нет подсветки','无背光'),
   ('keyboard_layout','US','US'),('keyboard_layout','RU','RU'),('keyboard_layout','CN','CN')
 ON CONFLICT (category, value) DO UPDATE SET value_zh = EXCLUDED.value_zh WHERE lib_values.value_zh IS NULL;
+
+-- ===== 5 новых функций =====
+
+-- 7. Источник привлечения клиента
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS source TEXT;
+
+-- 6. Напоминание об окончании гарантии — флаг, чтобы не слать повторно
+ALTER TABLE serials ADD COLUMN IF NOT EXISTS warranty_reminder_sent BOOLEAN NOT NULL DEFAULT false;
+
+-- 3. "Отложенный интерес" клиента — лёгкий вишлист без предоплаты. Когда модель появится
+-- на складе (тот же принцип, что уведомление о поступлении под предзаказ), клиенту придёт
+-- уведомление, а запись отметится как выполненная.
+CREATE TABLE IF NOT EXISTS wishlist (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  laptop_id UUID NOT NULL REFERENCES laptops(id) ON DELETE CASCADE,
+  note TEXT,
+  notified BOOLEAN NOT NULL DEFAULT false,
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 10. Публичная ссылка "поделиться моделью" — доступ без входа в систему
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS public_share_enabled BOOLEAN NOT NULL DEFAULT true;

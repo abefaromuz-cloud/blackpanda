@@ -25,7 +25,9 @@ router.get('/search', authenticate, requirePermission('warehouse', 'view'), asyn
 router.get('/lookup/:serial', authenticate, requirePermission('warehouse', 'view'), async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT s.*, l.brand, l.series, st.counts_as AS bucket
+      `SELECT s.*, l.brand, l.series, st.counts_as AS bucket,
+        (SELECT COUNT(*) FROM service_order_items soi WHERE soi.serial_id = s.id) AS service_visits,
+        (SELECT COUNT(*) FROM service_order_items soi WHERE soi.serial_id = s.id AND soi.is_warranty = true) AS warranty_cases
        FROM serials s JOIN laptops l ON l.id=s.laptop_id
        LEFT JOIN lib_statuses st ON st.label = s.status_id
        WHERE s.serial=$1`,
