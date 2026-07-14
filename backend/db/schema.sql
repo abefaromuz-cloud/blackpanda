@@ -964,3 +964,20 @@ CREATE TABLE IF NOT EXISTS service_item_history (
   note TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Новые характеристики ноутбука: частота экрана, тип матрицы, подсветка клавиатуры, раскладка.
+-- Все — необязательные, показываются только в карточке товара (не в таблице склада),
+-- значения ведутся через Справочник (как CPU/GPU/цвет и т.д.)
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS refresh_rate TEXT;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS screen_type TEXT;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS keyboard_backlight TEXT;
+ALTER TABLE laptops ADD COLUMN IF NOT EXISTS keyboard_layout TEXT;
+
+INSERT INTO lib_values (category, value, value_zh) VALUES
+  ('refresh_rate','60Hz','60Hz'),('refresh_rate','120Hz','120Hz'),('refresh_rate','144Hz','144Hz'),
+  ('refresh_rate','165Hz','165Hz'),('refresh_rate','240Hz','240Hz'),
+  ('screen_type','IPS','IPS'),('screen_type','OLED','OLED'),('screen_type','MiniLED','MiniLED'),
+  ('screen_type','TN','TN'),('screen_type','VA','VA'),
+  ('keyboard_backlight','Есть подсветка','有背光'),('keyboard_backlight','Нет подсветки','无背光'),
+  ('keyboard_layout','US','US'),('keyboard_layout','RU','RU'),('keyboard_layout','CN','CN')
+ON CONFLICT (category, value) DO UPDATE SET value_zh = EXCLUDED.value_zh WHERE lib_values.value_zh IS NULL;

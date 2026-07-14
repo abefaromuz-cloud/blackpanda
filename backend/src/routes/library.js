@@ -4,7 +4,7 @@ const { authenticate, requirePermission } = require('../middleware/auth');
 const { insertOrdered, renumber } = require('../utils/ordering');
 const router = express.Router();
 
-const CATEGORIES = ['cpu', 'gpu', 'ram', 'storage', 'color', 'screen'];
+const CATEGORIES = ['cpu', 'gpu', 'ram', 'storage', 'color', 'screen', 'refresh_rate', 'screen_type', 'keyboard_backlight', 'keyboard_layout'];
 const STATUS_BUCKETS = ['instock', 'intransit', 'reserved', 'sold', 'other'];
 
 router.get('/', authenticate, requirePermission('library', 'view'), async (req, res) => {

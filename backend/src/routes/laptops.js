@@ -65,15 +65,16 @@ router.get('/:id', authenticate, requirePermission('warehouse', 'view'), async (
 });
 
 router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
-  const { brand, series, cpu, ram, gpu, storage, color, screen, touch, images, cost_cny, price_sell_cny, low_stock_threshold, is_hot, mfr_item_code } = req.body;
+  const { brand, series, cpu, ram, gpu, storage, color, screen, touch, images, cost_cny, price_sell_cny, low_stock_threshold, is_hot, mfr_item_code, refresh_rate, screen_type, keyboard_backlight, keyboard_layout } = req.body;
   if (!brand) return res.status(400).json({ error: 'Укажите бренд' });
   try {
     const imgArr = Array.isArray(images) ? images.filter(Boolean) : [];
     const result = await pool.query(
-      `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,low_stock_threshold,is_hot,mfr_item_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+      `INSERT INTO laptops (brand,series,cpu,ram,gpu,storage,color,screen,touch,image_url,images,cost_cny,price_sell_cny,low_stock_threshold,is_hot,mfr_item_code,refresh_rate,screen_type,keyboard_backlight,keyboard_layout)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
       [brand, series||null, cpu||null, ram||null, gpu||null, storage||null, color||null, screen||null,
-       touch||'no', imgArr[0]||null, imgArr, cost_cny||0, price_sell_cny||0, low_stock_threshold||2, !!is_hot, mfr_item_code||null]
+       touch||'no', imgArr[0]||null, imgArr, cost_cny||0, price_sell_cny||0, low_stock_threshold||2, !!is_hot, mfr_item_code||null,
+       refresh_rate||null, screen_type||null, keyboard_backlight||null, keyboard_layout||null]
     );
     // Первая точка истории цены — чтобы мини-график сразу с чего-то начинался
     await pool.query('INSERT INTO price_history (laptop_id, price_cny) VALUES ($1,$2)', [result.rows[0].id, price_sell_cny || 0]);
@@ -99,11 +100,14 @@ router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (
         images=COALESCE($10,images), image_url=COALESCE($11,image_url),
         cost_cny=COALESCE($12,cost_cny), price_sell_cny=COALESCE($13,price_sell_cny),
         low_stock_threshold=COALESCE($14,low_stock_threshold), is_hot=COALESCE($15,is_hot),
-        mfr_item_code=COALESCE($16,mfr_item_code)
-       WHERE id=$17 RETURNING *`,
+        mfr_item_code=COALESCE($16,mfr_item_code),
+        refresh_rate=COALESCE($17,refresh_rate), screen_type=COALESCE($18,screen_type),
+        keyboard_backlight=COALESCE($19,keyboard_backlight), keyboard_layout=COALESCE($20,keyboard_layout)
+       WHERE id=$21 RETURNING *`,
       [f.brand,f.series,f.cpu,f.ram,f.gpu,f.storage,f.color,f.screen,f.touch,
        imgArr, imgArr ? imgArr[0] : null, f.cost_cny,f.price_sell_cny,f.low_stock_threshold,
-       f.is_hot !== undefined ? !!f.is_hot : null, f.mfr_item_code, req.params.id]
+       f.is_hot !== undefined ? !!f.is_hot : null, f.mfr_item_code,
+       f.refresh_rate, f.screen_type, f.keyboard_backlight, f.keyboard_layout, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Модель не найдена' });
     if (priceChanged) {
