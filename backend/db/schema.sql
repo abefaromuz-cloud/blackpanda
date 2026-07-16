@@ -1005,3 +1005,9 @@ CREATE TABLE IF NOT EXISTS wishlist (
 
 -- 10. Публичная ссылка "поделиться моделью" — доступ без входа в систему
 ALTER TABLE laptops ADD COLUMN IF NOT EXISTS public_share_enabled BOOLEAN NOT NULL DEFAULT true;
+
+-- Индексы для ускорения загрузки Склада — эти два поля участвуют в тяжёлых частях запроса
+-- (продажи за 30 дней, история цены), без индекса там были полные сканирования таблиц
+CREATE INDEX IF NOT EXISTS idx_sale_items_laptop ON sale_items(laptop_id);
+CREATE INDEX IF NOT EXISTS idx_price_history_laptop ON price_history(laptop_id, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);

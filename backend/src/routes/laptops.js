@@ -8,24 +8,35 @@ const router = express.Router();
 router.get('/', authenticate, requirePermission('warehouse', 'view'), async (req, res) => {
   try {
     const result = await pool.query(`
+      WITH sales_30d AS (
+        SELECT si.laptop_id, SUM(si.qty) AS qty
+        FROM sale_items si JOIN sales sale ON sale.id = si.sale_id
+        WHERE sale.created_at > now() - interval '30 days'
+        GROUP BY si.laptop_id
+      ),
+      price_hist_ranked AS (
+        SELECT laptop_id, price_cny, changed_at,
+          ROW_NUMBER() OVER (PARTITION BY laptop_id ORDER BY changed_at DESC) AS rn
+        FROM price_history
+      ),
+      price_sparklines AS (
+        SELECT laptop_id, json_agg(price_cny ORDER BY changed_at) AS spark
+        FROM price_hist_ranked WHERE rn <= 10
+        GROUP BY laptop_id
+      )
       SELECT l.*,
         COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock'))    AS in_stock,
         COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='intransit'))  AS in_transit,
         COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='reserved'))   AS reserved,
         COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='sold'))       AS sold,
         COUNT(s.id) AS total,
-        COALESCE((
-          SELECT SUM(si.qty) FROM sale_items si JOIN sales sale ON sale.id = si.sale_id
-          WHERE si.laptop_id = l.id AND sale.created_at > now() - interval '30 days'
-        ), 0) AS sold_last_30d,
-        COALESCE((
-          SELECT json_agg(x.price_cny ORDER BY x.changed_at) FROM (
-            SELECT price_cny, changed_at FROM price_history ph WHERE ph.laptop_id = l.id ORDER BY ph.changed_at DESC LIMIT 10
-          ) x
-        ), '[]') AS price_sparkline
+        COALESCE(s30.qty, 0) AS sold_last_30d,
+        COALESCE(psp.spark, '[]') AS price_sparkline
       FROM laptops l
       LEFT JOIN serials s ON s.laptop_id = l.id
-      GROUP BY l.id
+      LEFT JOIN sales_30d s30 ON s30.laptop_id = l.id
+      LEFT JOIN price_sparklines psp ON psp.laptop_id = l.id
+      GROUP BY l.id, s30.qty, psp.spark
       ORDER BY l.is_archived ASC, l.created_at DESC
     `);
     // Прогноз: сколько дней хватит остатка при текущем темпе продаж (среднее в день за последние 30 дней)
