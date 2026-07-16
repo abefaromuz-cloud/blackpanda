@@ -356,18 +356,18 @@ export default function Warehouse() {
               <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
                 <th className="pb-2 pl-4 pt-3 px-3">{tt("Фото")}</th>
                 {th('brand', t('model'))}
-                <th className="pb-2 px-3 border-l border-border/60">CPU</th>
-                <th className="pb-2 px-3 border-l border-border/60">RAM</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Накопитель")}</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Видеокарта")}</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Экран")}</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Цвет")}</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Сенсор")}</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Статус")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">CPU</th>
+                <th className="pb-2 px-3 border-l border-border/20">RAM</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Накопитель")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Видеокарта")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Экран")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Цвет")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Сенсор")}</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Статус")}</th>
                 {th('stock', t('inStock'))}
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Цена")} ¥</th>
-                <th className="pb-2 px-3 border-l border-border/60">{tt("Курс")}</th>
-                <th className="pb-2 pr-4 px-3 border-l border-border/60">{tt("Цена")} ₽</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Цена")} ¥</th>
+                <th className="pb-2 px-3 border-l border-border/20">{tt("Курс")}</th>
+                <th className="pb-2 pr-4 px-3 border-l border-border/20">{tt("Цена")} ₽</th>
               </tr>
             </thead>
             <tbody>
@@ -398,26 +398,26 @@ export default function Warehouse() {
                       <td className="py-2 pl-4 px-3">
                         <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
                       </td>
-                      <td className="py-2 px-3 border-l border-border/60">
+                      <td className="py-2 px-3 border-l border-border/20">
                         <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
                           {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
                         </Link>
                         {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
                       </td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('cpu', l.cpu) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('ram', l.ram) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('storage', l.storage) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('gpu', l.gpu) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('screen', l.screen) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{tr('color', l.color) || '—'}</td>
-                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/60">{l.touch === 'yes' ? tt('Да') : tt('Нет')}</td>
-                      <td className="py-2 px-3 border-l border-border/60">
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('cpu', l.cpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('ram', l.ram) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('storage', l.storage) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('gpu', l.gpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('screen', l.screen) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{tr('color', l.color) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3 border-l border-border/20">{l.touch === 'yes' ? tt('Да') : tt('Нет')}</td>
+                      <td className="py-2 px-3 border-l border-border/20">
                         <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
                         {l.is_archived && canEdit && (
                           <button onClick={() => restoreLaptop(l.id)} className="block text-[10px] text-accent2 hover:underline mt-0.5">↩️ {tt('Восстановить')}</button>
                         )}
                       </td>
-                      <td className="py-2 px-3 border-l border-border/60">
+                      <td className="py-2 px-3 border-l border-border/20">
                         <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
                         {l.days_left_forecast !== null && inStock > 0 && (
                           <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
@@ -425,14 +425,14 @@ export default function Warehouse() {
                           </div>
                         )}
                       </td>
-                      <td className="py-2 px-3 border-l border-border/60">
+                      <td className="py-2 px-3 border-l border-border/20">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
                           <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
                         </div>
                       </td>
-                      <td className="py-2 text-xs text-text3 font-mono px-3 border-l border-border/60">{rate}</td>
-                      <td className="py-2 pr-4 text-xs text-text3 font-mono px-3 border-l border-border/60">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
+                      <td className="py-2 text-xs text-text3 font-mono px-3 border-l border-border/20">{rate}</td>
+                      <td className="py-2 pr-4 text-xs text-text3 font-mono px-3 border-l border-border/20">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
                     </tr>
                   </>
                 );

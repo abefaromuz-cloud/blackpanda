@@ -49,7 +49,11 @@ export default function Arrivals() {
           <div className="grid md:grid-cols-2 gap-3 mb-3">
             <select className="inp" value={laptopId} onChange={e => setLaptopId(e.target.value)} required>
               <option value="">— {t('model')} —</option>
-              {laptops.map(l => <option key={l.id} value={l.id}>{l.brand} {l.series}</option>)}
+              {laptops.map(l => (
+                <option key={l.id} value={l.id}>
+                  {l.brand} {l.series} — {[l.cpu, l.ram, l.storage, l.gpu, l.color].filter(Boolean).join(' / ')}
+                </option>
+              ))}
             </select>
             <input className="inp" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <input className="inp" type="number" placeholder={t('unitCost')} value={costCny} onChange={e => setCostCny(e.target.value)} />

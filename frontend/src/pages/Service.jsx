@@ -86,7 +86,7 @@ function StageTimeline({ currentStage, dates = {} }) {
   const tt = useTT();
   const curIdx = STAGE_MAP[currentStage]?.index ?? 0;
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
+    <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 pt-2 pb-1">
       <div className="flex items-start min-w-[640px] sm:min-w-0">
         {STAGES.map(([id, ico, label, color], i) => {
           const isDone = i < curIdx;
@@ -215,9 +215,9 @@ export default function Service() {
   }, [allDevices, filter, searchQuery, searchMode]);
 
   const selectedDevice = useMemo(() => {
-    if (!selectedKey) return filteredDevices[0] || null;
-    return allDevices.find(d => `${d.order.id}:${d.id}` === selectedKey) || filteredDevices[0] || null;
-  }, [selectedKey, allDevices, filteredDevices]);
+    if (!selectedKey) return null;
+    return allDevices.find(d => `${d.order.id}:${d.id}` === selectedKey) || null;
+  }, [selectedKey, allDevices]);
 
   useEffect(() => {
     if (selectedDevice && !stageHistory[selectedDevice.id]) {
@@ -327,7 +327,7 @@ export default function Service() {
           <h1 className="text-2xl font-black flex items-center gap-2">🔧 {t('service')}</h1>
           <div className="text-text3 text-sm mt-0.5">{tt('Управление сервисными случаями и ремонтом ноутбуков')}</div>
         </div>
-        {canEdit && <button className="btn btn-primary shadow-glow" onClick={() => setShowForm(s => !s)}>+ {t('newServiceOrder')}</button>}
+        {canEdit && <button className="btn btn-primary shadow-glow" onClick={() => setShowForm(s => !s)}>{t('newServiceOrder')}</button>}
       </div>
 
       {/* ===== Статистика сверху ===== */}
@@ -393,6 +393,7 @@ export default function Service() {
           onNotify={() => notifyItem(selectedDevice.order.id, selectedDevice.id)}
           onShowHistory={() => setShowHistoryFor(selectedDevice.id)}
           onDelete={() => removeItem(selectedDevice.order.id, selectedDevice.id)}
+          onClose={() => setSelectedKey(null)}
         />
       )}
 
@@ -522,7 +523,7 @@ export default function Service() {
 }
 
 // ===== Большая карточка выбранного устройства (фото/специфика/гарантия/timeline/прогресс/действия) =====
-function DeviceDetailCard({ device, rate, canEdit, history, onStageClick, onEdit, onNotify, onShowHistory, onDelete }) {
+function DeviceDetailCard({ device, rate, canEdit, history, onStageClick, onEdit, onNotify, onShowHistory, onDelete, onClose }) {
   const tt = useTT();
   const st = STAGE_MAP[device.stage];
   const nextStage = STAGES[st.index + 1];
@@ -542,7 +543,8 @@ function DeviceDetailCard({ device, rate, canEdit, history, onStageClick, onEdit
   const totalDays = daysBetween(new Date(device.created_at), device.stage === 'done' ? stageEnteredAt : new Date());
 
   return (
-    <div className="card mb-5 animate-[fadeIn_0.2s_ease]">
+    <div className="card mb-5 animate-[fadeIn_0.2s_ease] relative">
+      <button onClick={onClose} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-bg3 hover:bg-bg4 text-text3 hover:text-text flex items-center justify-center text-sm z-10" title={tt('Закрыть')}>✕</button>
       <div className="grid md:grid-cols-[180px_1fr] gap-5 mb-5">
         {/* Фото */}
         <div className="aspect-square rounded-2xl bg-bg3 overflow-hidden flex items-center justify-center flex-shrink-0">
