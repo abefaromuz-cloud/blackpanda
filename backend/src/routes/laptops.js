@@ -139,6 +139,27 @@ router.post('/:id/restore', authenticate, requirePermission('warehouse', 'edit')
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Удалить карточку НАВСЕГДА (без возможности восстановить) — доступно только для уже архивных
+// карточек, как вторая ступень удаления. Защищено от потери реальной истории: если по этой
+// модели уже были продажи или предзаказы, окончательное удаление заблокировано — их сначала
+// нужно перенести через "Объединить дубль" на другую карточку.
+router.delete('/:id/permanent', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
+  try {
+    const l = await pool.query('SELECT is_archived FROM laptops WHERE id=$1', [req.params.id]);
+    if (!l.rows[0]) return res.status(404).json({ error: 'Модель не найдена' });
+    if (!l.rows[0].is_archived) return res.status(400).json({ error: 'Сначала удали карточку обычным способом (в архив), потом уже можно удалить навсегда' });
+
+    const salesCount = await pool.query('SELECT COUNT(*) AS n FROM sale_items WHERE laptop_id=$1', [req.params.id]);
+    const preorderCount = await pool.query('SELECT COUNT(*) AS n FROM preorder_items WHERE laptop_id=$1', [req.params.id]);
+    if (Number(salesCount.rows[0].n) > 0 || Number(preorderCount.rows[0].n) > 0) {
+      return res.status(400).json({ error: 'Нельзя удалить навсегда — по этой модели уже есть история продаж или предзаказов. Используй «Объединить дубль», чтобы перенести её на другую карточку, либо оставь в архиве.' });
+    }
+
+    await pool.query('DELETE FROM laptops WHERE id=$1', [req.params.id]); // серийники и история цены уйдут каскадом
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
+});
+
 // Объединение дублей модели — например, если импорт из старой версии создал две карточки
 // для одного и того же товара (одна с латиницей/кириллицей, другая с китайским названием).
 // Переносит все серийники, позиции продаж/предзаказов и историю цены на "оригинал",

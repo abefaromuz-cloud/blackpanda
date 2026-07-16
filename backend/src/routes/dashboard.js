@@ -7,7 +7,7 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
   try {
     const [
       stock, sales30, settings, lowStock, debts, monthly, topModels,
-      specialStatuses, yearlyProfit, byBrand, recentSales, recentActivity, tasks,
+      specialStatuses, yearlyProfit, byBrand, recentSales, recentActivity, tasks, stuckService,
     ] = await Promise.all([
       pool.query(`SELECT
           COUNT(*) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock'))   AS in_stock,
@@ -94,6 +94,19 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
         SELECT t.*, c.name AS client_name FROM tasks t LEFT JOIN clients c ON c.id = t.client_id
         WHERE t.done = false ORDER BY t.due_date NULLS LAST, t.created_at LIMIT 20
       `),
+      // Устройства, которые лежат в сервисе слишком долго (14+ дней) и ещё не выданы клиенту
+      pool.query(`
+        SELECT soi.id, soi.created_at, soi.status AS stage, so.id AS order_id, so.client_id,
+          c.name AS client_name, l.brand, l.series, s.serial, soi.device_label
+        FROM service_order_items soi
+        JOIN service_orders so ON so.id = soi.service_order_id
+        LEFT JOIN clients c ON c.id = so.client_id
+        LEFT JOIN serials s ON s.id = soi.serial_id
+        LEFT JOIN laptops l ON l.id = s.laptop_id
+        WHERE soi.status != 'done' AND soi.created_at < now() - interval '14 days'
+        ORDER BY soi.created_at ASC
+        LIMIT 10
+      `),
     ]);
 
     const statusMap = {};
@@ -108,6 +121,7 @@ router.get('/', authenticate, requirePermission('dashboard', 'view'), async (req
       rate: Number(settings.rows[0].rate),
       cash_balance_rub: Number(settings.rows[0].cash_balance_rub),
       low_stock: lowStock.rows,
+      stuck_service: stuckService.rows,
       debts: debts.rows,
       monthly: monthly.rows,
       top_models: topModels.rows,

@@ -8,6 +8,12 @@ const { startWarrantyReminderScheduler } = require('./utils/warrantyReminder');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+// Запрещаем браузеру кэшировать ответы API — иначе после изменения данных (например, курса
+// в Настройках) другие страницы могли показывать устаревшее значение, пока не обновишь вручную
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'BlackPanda CRM API' }));
 app.use('/api/auth',      require('./routes/auth'));

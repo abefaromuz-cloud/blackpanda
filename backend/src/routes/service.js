@@ -53,7 +53,10 @@ router.get('/', authenticate, requirePermission('service', 'view'), async (req, 
           'issue', soi.issue, 'is_warranty', soi.is_warranty, 'cost_cny', soi.cost_cny,
           'technician', soi.technician, 'stage', soi.status, 'return_status', soi.return_status,
           'tracking', soi.tracking, 'expected_date', soi.expected_date,
-          'serial', s.serial, 'brand', l.brand, 'series', l.series
+          'serial', s.serial, 'brand', l.brand, 'series', l.series,
+          'cpu', l.cpu, 'ram', l.ram, 'gpu', l.gpu, 'storage', l.storage, 'color', l.color, 'screen', l.screen,
+          'created_at', soi.created_at, 'image_url', l.image_url,
+          'sale_date', s.sale_date, 'warranty_months', s.warranty_months
         ) ORDER BY soi.created_at) FILTER (WHERE soi.id IS NOT NULL), '[]') AS items
       FROM service_orders so
       LEFT JOIN clients c ON c.id = so.client_id
