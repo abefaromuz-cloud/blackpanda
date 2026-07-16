@@ -18,6 +18,7 @@ function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort(); }
 
 export default function Warehouse() {
   const [laptops, setLaptops] = useState([]);
+  const [loadError, setLoadError] = useState('');
   const [reservations, setReservations] = useState([]);
   const [rate, setRate] = useState(0);
   const [showForm, setShowForm] = useState(false);
@@ -36,7 +37,8 @@ export default function Warehouse() {
   const canEdit = can('warehouse', 'edit');
 
   function load() {
-    api.get('/laptops').then(r => setLaptops(r.data));
+    api.get('/laptops').then(r => { setLaptops(r.data); setLoadError(''); })
+      .catch(err => setLoadError(err.response?.data?.error || 'Не удалось загрузить склад'));
     api.get('/reservations').then(r => setReservations(r.data));
     api.get('/settings/public-rate').then(r => setRate(r.data.rate));
   }
@@ -229,6 +231,7 @@ export default function Warehouse() {
 
   return (
     <div>
+      {loadError && <div className="card border border-red text-red text-sm mb-4">⚠️ {tt("Не удалось загрузить склад")}: {loadError}</div>}
       <div className="flex justify-between items-center mb-5 flex-wrap gap-2">
         <h1 className="text-2xl font-black">{t('warehouse')} <span className="text-text3 text-sm font-normal">{filtered.length}/{laptops.length}</span></h1>
         <div className="flex gap-2">
