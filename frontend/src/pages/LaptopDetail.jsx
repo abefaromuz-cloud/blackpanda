@@ -29,13 +29,13 @@ const SPEC_ICONS = {
   keyboard_layout: [Keyboard, 'bg-blue-500/15 text-blue-400'],
 };
 
-function SpecBox({ Icon, iconClass, label, value }) {
+function SpecBox({ Icon, iconClass, label, value, compact }) {
   return (
     <div className="card flex items-center gap-3 py-3">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClass}`}><Icon size={17} /></div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[10px] text-text3 uppercase font-bold tracking-wide">{label}</div>
-        <div className="font-bold text-sm truncate">{value || '—'}</div>
+        <div className={`font-bold ${compact ? 'text-xs whitespace-normal break-words' : 'text-sm truncate'}`}>{value || '—'}</div>
       </div>
     </div>
   );
@@ -109,6 +109,12 @@ export default function LaptopDetail() {
     }
   }
 
+  async function restoreLaptop() {
+    if (!confirm(tt('Вернуть эту модель обратно в активный список?'))) return;
+    await api.post(`/laptops/${id}/restore`);
+    load();
+  }
+
   async function confirmDelete() {
     const expected = `${l.brand} ${l.series || ''}`.trim();
     if (deleteConfirmText.trim() !== expected) {
@@ -117,7 +123,11 @@ export default function LaptopDetail() {
     }
     setDeleting(true);
     try {
-      await api.delete(`/laptops/${id}`);
+      if (l.is_archived) {
+        await api.delete(`/laptops/${id}/permanent`);
+      } else {
+        await api.delete(`/laptops/${id}`);
+      }
       navigate('/warehouse');
     } catch (e2) {
       alert(e2.response?.data?.error || 'Ошибка удаления');
@@ -250,17 +260,21 @@ export default function LaptopDetail() {
             {tr('series', l.series) !== l.series ? ` — ${tr('series', l.series)}` : ''}
             {l.is_hot && <span className="badge badge-yellow ml-1">🔥 {tt("хит")}</span>}
           </h1>
-          <div className="text-text3 text-sm">{l.series}</div>
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className="text-text3 text-sm">{l.series}</span>
+            <span className="badge badge-blue font-mono text-[10px]">{l.item_code || '—'}</span>
+            {l.mfr_item_code && <span className="badge badge-purple font-mono text-[10px]">ITEM: {l.mfr_item_code}</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="badge badge-blue font-mono">{l.item_code || '—'}</span>
-          {l.mfr_item_code && <span className="badge badge-purple font-mono">ITEM: {l.mfr_item_code}</span>}
-          {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
-          {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMerge(s => !s)}>🔗 {tt("Объединить дубль")}</button>}
-          {canEdit && <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(s => !s)}>🗑️ {tt("Удалить модель")}</button>}
-          {canEdit && <button className="btn btn-secondary btn-sm" onClick={openWishlist}>👀 {tt("Клиент ждёт эту модель")}</button>}
-          <button className="btn btn-secondary btn-sm" onClick={copyShareLink}>🔗 {shareLinkCopied ? tt('Скопировано!') : tt('Ссылка для клиента')}</button>
-        </div>
+      </div>
+
+      {/* Панель действий — отдельно от заголовка, чтобы не мешать информационным бейджам сверху */}
+      <div className="flex items-center gap-2 flex-wrap bg-bg3 rounded-xl p-2 mb-4">
+        {canEdit && <button className="btn btn-secondary btn-sm" onClick={startEdit}>✏️ {t('edit')}</button>}
+        {canEdit && <button className="btn btn-secondary btn-sm" onClick={() => setShowMerge(s => !s)}>🔗 {tt("Объединить дубль")}</button>}
+        {canEdit && <button className="btn btn-secondary btn-sm" onClick={openWishlist}>👀 {tt("Клиент ждёт эту модель")}</button>}
+        <button className="btn btn-secondary btn-sm" onClick={copyShareLink}>🔗 {shareLinkCopied ? tt('Скопировано!') : tt('Ссылка для клиента')}</button>
+        {canEdit && <button className="btn btn-danger btn-sm ml-auto" onClick={() => setShowDelete(s => !s)}>🗑️ {tt("Удалить модель")}</button>}
       </div>
 
       {showMerge && (
@@ -292,17 +306,31 @@ export default function LaptopDetail() {
 
       {showDelete && (
         <div className="card mb-5 border border-red/50">
-          <div className="font-bold text-sm mb-1 text-red">🗑️ {tt("Удалить эту модель насовсем?")}</div>
-          <div className="text-xs text-text3 mb-3">
-            {tt("Модель")} «{l.brand} {l.series || ''}» {tt("и все её серийники исчезнут из активного склада. История уже прошедших продаж по этой модели сохранится и не потеряется — удаление затрагивает только карточку и остаток на складе.")}
-          </div>
+          {l.is_archived ? (
+            <>
+              <div className="font-bold text-sm mb-1 text-red">💀 {tt("Удалить эту модель НАВСЕГДА? Это нельзя отменить")}</div>
+              <div className="text-xs text-text3 mb-3">
+                {tt("Эта карточка уже в архиве")} — {tt("это второй, окончательный шаг: модель и все её серийники будут стёрты из базы без возможности восстановить. Если по этой модели уже была хоть одна продажа или предзаказ, удаление будет заблокировано — сначала перенеси историю через «Объединить дубль».")}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-bold text-sm mb-1 text-red">🗑️ {tt("Удалить эту модель насовсем?")}</div>
+              <div className="text-xs text-text3 mb-3">
+                {tt("Модель")} «{l.brand} {l.series || ''}» {tt("и все её серийники исчезнут из активного склада. История уже прошедших продаж по этой модели сохранится и не потеряется — удаление затрагивает только карточку и остаток на складе.")}
+              </div>
+              <div className="text-xs text-text2 mb-3 bg-bg3 rounded-lg p-2">
+                ℹ️ {tt("Карточка сначала уйдёт в архив (её можно будет восстановить). Чтобы стереть насовсем — зайди в неё ещё раз из архива и удали повторно.")}
+              </div>
+            </>
+          )}
           <div className="text-xs text-text2 mb-2">
             {tt("Чтобы подтвердить, введи название модели точно так же, как оно указано выше")}: <b>{l.brand} {l.series || ''}</b>
           </div>
           <input className="inp mb-3" placeholder={`${l.brand} ${l.series || ''}`} value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} />
           <div className="flex items-center gap-2 flex-wrap">
             <button className="btn btn-danger btn-sm" onClick={confirmDelete} disabled={deleting}>
-              {deleting ? tt('Удаляю...') : `🗑️ ${tt('Удалить насовсем')}`}
+              {deleting ? tt('Удаляю...') : l.is_archived ? `💀 ${tt('Удалить навсегда')}` : `🗑️ ${tt('Удалить насовсем')}`}
             </button>
             <button className="text-text3 text-xs hover:text-text" onClick={() => { setShowDelete(false); setDeleteConfirmText(''); }}>{t('cancel')}</button>
           </div>
@@ -331,9 +359,14 @@ export default function LaptopDetail() {
       )}
 
       <div className="flex items-center gap-2 flex-wrap mb-5">
-        <span className={`badge ${inStockCount > 0 ? 'badge-green' : 'badge-red'}`}>📦 {overallStatus}</span>
-        <span className="badge badge-yellow">{inStockCount} / {l.serials.length} {tt("шт.")}</span>
-        <span className="badge badge-blue">🕐 {tt("Добавлено")}: {new Date(l.created_at).toLocaleDateString('ru-RU')}</span>
+        {l.is_archived && (
+          <>
+            <span className="badge bg-bg4 text-text3">🗄️ {tt("В архиве")}</span>
+            {canEdit && <button className="btn btn-secondary btn-sm" onClick={restoreLaptop}>↩️ {tt("Восстановить")}</button>}
+          </>
+        )}
+        <span className={`badge ${inStockCount > 0 ? 'badge-green' : 'badge-red'}`}>📦 {overallStatus} · {inStockCount} / {l.serials.length} {tt("шт.")}</span>
+        <span className="text-text3 text-xs">🕐 {tt("Добавлено")}: {new Date(l.created_at).toLocaleDateString('ru-RU')}</span>
       </div>
 
       {editing ? (
@@ -418,9 +451,9 @@ export default function LaptopDetail() {
             <SpecBox Icon={SPEC_ICONS.color[0]} iconClass={SPEC_ICONS.color[1]} label={tt("Цвет")} value={tr('color', l.color)} />
             <SpecBox Icon={SPEC_ICONS.touch[0]} iconClass={SPEC_ICONS.touch[1]} label={tt("Сенсор")} value={l.touch === 'yes' ? tt('Да') : tt('Нет')} />
             <SpecBox Icon={SPEC_ICONS.stock[0]} iconClass={SPEC_ICONS.stock[1]} label={tt("На складе")} value={`${inStockCount} / ${l.serials.length}`} />
-            <SpecBox Icon={SPEC_ICONS.price[0]} iconClass={SPEC_ICONS.price[1]} label={tt("Цена продажи")} value={
-              <span className="flex items-center gap-2">
-                ¥{l.price_sell_cny} ≈ {Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽
+            <SpecBox compact Icon={SPEC_ICONS.price[0]} iconClass={SPEC_ICONS.price[1]} label={tt("Цена продажи")} value={
+              <span className="flex items-center gap-2 flex-wrap">
+                <span>¥{l.price_sell_cny} <span className="text-text3">≈ {Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</span></span>
                 <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
               </span>
             } />

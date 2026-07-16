@@ -17,7 +17,7 @@ export default function Header() {
   const [showResults, setShowResults] = useState(false);
   const [rate, setRate] = useState(null);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifData, setNotifData] = useState({ lowStock: [], debts: [] });
+  const [notifData, setNotifData] = useState({ lowStock: [], debts: [], stuckService: [] });
   const [dismissed, setDismissed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bp_dismissed_notifs') || '[]'); } catch { return []; }
   });
@@ -27,7 +27,7 @@ export default function Header() {
 
   useEffect(() => {
     if (!can('dashboard', 'view')) return;
-    api.get('/dashboard').then(r => setNotifData({ lowStock: r.data.low_stock || [], debts: r.data.debts || [] })).catch(() => {});
+    api.get('/dashboard').then(r => setNotifData({ lowStock: r.data.low_stock || [], debts: r.data.debts || [], stuckService: r.data.stuck_service || [] })).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -57,12 +57,14 @@ export default function Header() {
   // уже было очищено.
   function lowStockSig(l) { return `stock:${l.id}:${l.in_stock}`; }
   function debtSig(c) { return `debt:${c.id}:${Math.round(c.debt_rub)}:${Math.round(c.debt_cny || 0)}`; }
+  function stuckSig(s) { return `stuck:${s.id}:${s.stage}`; } // остаётся скрытым, пока не сменится этап
   const visibleLowStock = notifData.lowStock.filter(l => !dismissed.includes(lowStockSig(l)));
   const visibleDebts = notifData.debts.filter(c => !dismissed.includes(debtSig(c)));
-  const visibleCount = visibleLowStock.length + visibleDebts.length;
+  const visibleStuck = notifData.stuckService.filter(s => !dismissed.includes(stuckSig(s)));
+  const visibleCount = visibleLowStock.length + visibleDebts.length + visibleStuck.length;
 
   function clearAllNotifs() {
-    const allSigs = [...notifData.lowStock.map(lowStockSig), ...notifData.debts.map(debtSig)];
+    const allSigs = [...notifData.lowStock.map(lowStockSig), ...notifData.debts.map(debtSig), ...notifData.stuckService.map(stuckSig)];
     const next = [...new Set([...dismissed, ...allSigs])];
     setDismissed(next);
     localStorage.setItem('bp_dismissed_notifs', JSON.stringify(next));
@@ -161,6 +163,20 @@ export default function Header() {
                       </span>
                     </button>
                   ))}
+                </div>
+              )}
+              {visibleStuck.length > 0 && (
+                <div>
+                  <div className="text-[10px] text-red uppercase font-bold mb-1 mt-2">🔧 {tt("Задержались в сервисе")}</div>
+                  {visibleStuck.map(s => {
+                    const days = Math.floor((Date.now() - new Date(s.created_at)) / 86400000);
+                    return (
+                      <button key={s.id} onClick={() => { setNotifOpen(false); navigate('/service'); }} className="w-full text-left text-xs py-1 hover:text-accent2 flex justify-between">
+                        <span>{s.brand ? `${s.brand} ${s.series}` : s.device_label} {s.client_name && `· ${s.client_name}`}</span>
+                        <span className="font-mono text-red">{days} {tt('дн.')}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
