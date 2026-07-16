@@ -205,6 +205,11 @@ export default function Warehouse() {
     return [...inStock, ...outStock];
   }, [laptops, search, filters, sort]);
 
+  function th(col, label) {
+    const arrow = sort.col === col ? (sort.dir === 1 ? ' ↑' : ' ↓') : '';
+    return <th className="pb-2 cursor-pointer select-none" onClick={() => setSort(s => s.col === col ? { col, dir: -s.dir } : { col, dir: 1 })}>{label}{arrow}</th>;
+  }
+
   function exportExcel() {
     const rows = filtered.map(l => `<tr>
       <td>${l.brand}</td><td>${l.series || ''}</td><td>${l.cpu || ''}</td><td>${l.ram || ''}</td>
@@ -347,27 +352,25 @@ export default function Warehouse() {
         )}
       </div>
 
-      {/* ===== Мобильный вид — та же полная таблица, мельче шрифтом (как в старой версии),
-           со скроллом вбок — здесь это нормально, в отличие от ПК ===== */}
-      <div className="lg:hidden card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ fontSize: '12px' }}>
+          <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[10px] uppercase text-text3 border-b border-border bg-bg3">
-                <th className="py-2 pl-3 pr-2">{tt("Фото")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{t('model')}</th>
-                <th className="py-2 px-2 whitespace-nowrap">CPU</th>
-                <th className="py-2 px-2 whitespace-nowrap">RAM</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Накопитель")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Видеокарта")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Экран")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Цвет")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Сенсор")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Статус")}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{t('inStock')}</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Цена")} ¥</th>
-                <th className="py-2 px-2 whitespace-nowrap">{tt("Курс")}</th>
-                <th className="py-2 pr-3 pl-2 whitespace-nowrap">{tt("Цена")} ₽</th>
+              <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
+                <th className="pb-2 pl-4 pt-3 px-3">{tt("Фото")}</th>
+                {th('brand', t('model'))}
+                <th className="pb-2 px-3">CPU</th>
+                <th className="pb-2 px-3">RAM</th>
+                <th className="pb-2 px-3">{tt("Накопитель")}</th>
+                <th className="pb-2 px-3">{tt("Видеокарта")}</th>
+                <th className="pb-2 px-3">{tt("Экран")}</th>
+                <th className="pb-2 px-3">{tt("Цвет")}</th>
+                <th className="pb-2 px-3">{tt("Сенсор")}</th>
+                <th className="pb-2 px-3">{tt("Статус")}</th>
+                {th('stock', t('inStock'))}
+                <th className="pb-2 px-3">{tt("Цена")} ¥</th>
+                <th className="pb-2 px-3">{tt("Курс")}</th>
+                <th className="pb-2 pr-4 px-3">{tt("Цена")} ₽</th>
               </tr>
             </thead>
             <tbody>
@@ -389,127 +392,58 @@ export default function Warehouse() {
                   <>
                     {showDivider && (
                       <tr key={`divider-${l.id}`}>
-                        <td colSpan={14} className="py-2 pl-3 text-[10px] uppercase text-text3 font-bold border-b border-border">
+                        <td colSpan={15} className="py-2 pl-4 text-[10px] uppercase text-text3 font-bold border-b border-border">
                           ⬇️ {tt('Нет в наличии / архив')}
                         </td>
                       </tr>
                     )}
                     <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 ${inStock === 0 ? 'opacity-50' : ''} ${l.is_archived ? 'bg-bg3/40' : ''}`}>
-                      <td className="py-1.5 pl-3 pr-2">
-                        <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-9 h-7 object-contain rounded bg-bg3" alt="" />
+                      <td className="py-2 pl-4 px-3">
+                        <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
                       </td>
-                      <td className="py-1.5 px-2">
-                        <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium whitespace-nowrap block">
-                          {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && '🔥'}
+                      <td className="py-2 px-3">
+                        <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block">
+                          {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
                         </Link>
+                        {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
                       </td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('cpu', l.cpu) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('ram', l.ram) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('storage', l.storage) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('gpu', l.gpu) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('screen', l.screen) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{tr('color', l.color) || '—'}</td>
-                      <td className="py-1.5 px-2 text-text3 whitespace-nowrap">{l.touch === 'yes' ? tt('Да') : tt('Нет')}</td>
-                      <td className="py-1.5 px-2 whitespace-nowrap"><span className={`badge ${statusInfo.cls}`} style={{ fontSize: '10px' }}>{statusInfo.label}</span></td>
-                      <td className="py-1.5 px-2 whitespace-nowrap">
+                      <td className="py-2 text-xs text-text3 px-3">{tr('cpu', l.cpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{tr('ram', l.ram) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{tr('storage', l.storage) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{tr('gpu', l.gpu) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{tr('screen', l.screen) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{tr('color', l.color) || '—'}</td>
+                      <td className="py-2 text-xs text-text3 px-3">{l.touch === 'yes' ? tt('Да') : tt('Нет')}</td>
+                      <td className="py-2 px-3">
+                        <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
+                        {l.is_archived && canEdit && (
+                          <button onClick={() => restoreLaptop(l.id)} className="block text-[10px] text-accent2 hover:underline mt-0.5">↩️ {tt('Восстановить')}</button>
+                        )}
+                      </td>
+                      <td className="py-2 px-3">
                         <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
+                        {l.days_left_forecast !== null && inStock > 0 && (
+                          <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
+                            ~{l.days_left_forecast} {tt('дн. запаса')}
+                          </div>
+                        )}
                       </td>
-                      <td className="py-1.5 px-2 font-mono text-yellow font-bold whitespace-nowrap">¥{l.price_sell_cny}</td>
-                      <td className="py-1.5 px-2 text-text3 font-mono whitespace-nowrap">{rate}</td>
-                      <td className="py-1.5 pr-3 pl-2 text-text3 font-mono whitespace-nowrap">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
+                          <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
+                        </div>
+                      </td>
+                      <td className="py-2 text-xs text-text3 font-mono px-3">{rate}</td>
+                      <td className="py-2 pr-4 text-xs text-text3 font-mono px-3">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>
                     </tr>
                   </>
                 );
               })}
-              {!filtered.length && <tr><td colSpan={14} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
+              {!filtered.length && <tr><td colSpan={15} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* ===== ПК — компактная таблица, характеристики объединены, чтобы помещалось без прокрутки ===== */}
-      <div className="hidden lg:block card p-0 overflow-hidden">
-        <table className="w-full text-sm table-fixed">
-          <thead>
-            <tr className="text-left text-[10px] uppercase text-text3 border-b border-border">
-              <th className="pb-2 pl-4 pt-3 w-16">{tt("Фото")}</th>
-              <th className="pb-2 pt-3 cursor-pointer select-none" onClick={() => setSort(s => s.col === 'brand' ? { col: 'brand', dir: -s.dir } : { col: 'brand', dir: 1 })}>{t('model')}{sort.col === 'brand' ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</th>
-              <th className="pb-2 pt-3">{tt("Характеристики")}</th>
-              <th className="pb-2 pt-3 w-28">{tt("Статус")}</th>
-              <th className="pb-2 pt-3 cursor-pointer select-none w-24" onClick={() => setSort(s => s.col === 'stock' ? { col: 'stock', dir: -s.dir } : { col: 'stock', dir: 1 })}>{t('inStock')}{sort.col === 'stock' ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</th>
-              <th className="pb-2 pr-4 pt-3 w-40">{tt("Цена")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((l, idx) => {
-              const inStock = Number(l.in_stock);
-              const reserved = Number(l.reserved);
-              const prevInStock = idx > 0 ? Number(filtered[idx - 1].in_stock) : null;
-              const showDivider = idx > 0 && prevInStock > 0 && inStock === 0;
-              const statusInfo = l.is_archived
-                ? { label: tt('Архив'), cls: 'badge-blue' }
-                : inStock > 0
-                  ? { label: tt('В наличии'), cls: 'badge-green' }
-                  : reserved > 0
-                    ? { label: tt('Резерв'), cls: 'badge-yellow' }
-                    : Number(l.total) > 0
-                      ? { label: tt('Продано'), cls: 'badge-red' }
-                      : { label: '—', cls: 'badge-blue' };
-              const specs = [tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage), tr('gpu', l.gpu)].filter(Boolean).join(' · ');
-              const specs2 = [tr('screen', l.screen), tr('color', l.color), l.touch === 'yes' ? `👆 ${tt('сенсор')}` : null].filter(Boolean).join(' · ');
-              return (
-                <>
-                  {showDivider && (
-                    <tr key={`divider-${l.id}`}>
-                      <td colSpan={6} className="py-2 pl-4 text-[10px] uppercase text-text3 font-bold border-b border-border">
-                        ⬇️ {tt('Нет в наличии / архив')}
-                      </td>
-                    </tr>
-                  )}
-                  <tr key={l.id} className={`border-b border-border last:border-0 hover:bg-bg3 transition-colors ${inStock === 0 ? 'opacity-50' : ''} ${l.is_archived ? 'bg-bg3/40' : ''}`}>
-                    <td className="py-2.5 pl-4">
-                      <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-9 object-contain rounded bg-bg3" alt="" />
-                    </td>
-                    <td className="py-2.5">
-                      <Link to={`/warehouse/${l.id}`} className="hover:text-accent2 font-medium block truncate">
-                        {tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && <span className="badge badge-yellow ml-1">🔥</span>}
-                      </Link>
-                      {l.mfr_item_code && <div className="text-[10px] text-text3 font-mono">ITEM: {l.mfr_item_code}</div>}
-                    </td>
-                    <td className="py-2.5 text-xs text-text3">
-                      <div className="truncate">{specs}</div>
-                      <div className="truncate">{specs2}</div>
-                    </td>
-                    <td className="py-2.5">
-                      <span className={`badge ${statusInfo.cls}`}>{statusInfo.label}</span>
-                      {l.is_archived && canEdit && (
-                        <button onClick={() => restoreLaptop(l.id)} className="block text-[10px] text-accent2 hover:underline mt-0.5">↩️ {tt('Восстановить')}</button>
-                      )}
-                    </td>
-                    <td className="py-2.5">
-                      <span className={`font-mono font-bold ${inStock <= Number(l.low_stock_threshold) && inStock > 0 ? 'text-red' : inStock > 0 ? 'text-green' : 'text-text3'}`}>{l.in_stock}</span>
-                      {l.days_left_forecast !== null && inStock > 0 && (
-                        <div className={`text-[10px] ${l.days_left_forecast <= 14 ? 'text-yellow' : 'text-text3'}`}>
-                          ~{l.days_left_forecast} {tt('дн. запаса')}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <div>
-                          <div className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</div>
-                          <div className="text-[10px] text-text3 font-mono">≈{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')}₽</div>
-                        </div>
-                        <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
-                      </div>
-                    </td>
-                  </tr>
-                </>
-              );
-            })}
-            {!filtered.length && <tr><td colSpan={6} className="text-center py-8 text-text3">{tt("Нет ноутбуков")}</td></tr>}
-          </tbody>
-        </table>
       </div>
     </div>
   );
