@@ -15,9 +15,9 @@ const PAYMENT_LABEL = {
 export default function Sales() {
   const [sales, setSales] = useState([]);
   const [clients, setClients] = useState([]);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [clientFilter, setClientFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => sessionStorage.getItem('bp_sales_from') || '');
+  const [dateTo, setDateTo] = useState(() => sessionStorage.getItem('bp_sales_to') || '');
+  const [clientFilter, setClientFilter] = useState(() => sessionStorage.getItem('bp_sales_client') || '');
   const [expanded, setExpanded] = useState({});
   const { t } = useLang();
   const tt = useTT();
@@ -29,6 +29,9 @@ export default function Sales() {
     api.get('/clients').then(r => setClients(r.data));
   }
   useEffect(load, []);
+  useEffect(() => { sessionStorage.setItem('bp_sales_from', dateFrom); }, [dateFrom]);
+  useEffect(() => { sessionStorage.setItem('bp_sales_to', dateTo); }, [dateTo]);
+  useEffect(() => { sessionStorage.setItem('bp_sales_client', clientFilter); }, [clientFilter]);
 
   const filtered = useMemo(() => {
     return sales.filter(s => {

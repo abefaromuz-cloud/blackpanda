@@ -573,7 +573,7 @@ function DeviceDetailCard({ device, rate, canEdit, history, onStageClick, onEdit
               {device.color && <div>🎨 {device.color}</div>}
             </div>
           )}
-          <div className="text-xs text-text3">{tt('Заказ')} No.{device.order.id.slice(-6)} · {device.order.client_name || tt('Без клиента')}</div>
+          <div className="text-xs text-text3">{tt('Заказ')} No.{device.order.id.slice(-6)} · {device.order.client_id ? <Link to={`/clients/${device.order.client_id}`} className="text-accent2 hover:underline">{device.order.client_name} →</Link> : tt('Без клиента')}</div>
         </div>
       </div>
 

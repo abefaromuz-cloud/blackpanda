@@ -102,7 +102,7 @@ export default function SerialDetail() {
               {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
             </select>
           ) : <div className="text-sm"><span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span></div>}
-          {s.client_name && <div className="text-xs text-text3 mt-1">{tt("Клиент")}: {s.client_name}</div>}
+          {s.client_name && <div className="text-xs text-text3 mt-1">{tt("Клиент")}: <Link to={`/clients/${s.sale_client_id}`} className="text-accent2 hover:underline">{s.client_name} →</Link></div>}
 
           <div className="mt-3">
             <label className="block text-[11px] text-text2 font-bold uppercase mb-1">{tt("Гарантия (мес.)")}</label>

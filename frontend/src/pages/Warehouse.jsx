@@ -25,9 +25,12 @@ export default function Warehouse() {
   const [form, setForm] = useState(emptyForm);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => sessionStorage.getItem('bp_wh_search') || '');
   const [serialMatches, setSerialMatches] = useState([]);
-  const [filters, setFilters] = useState({ brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '' });
+  const [filters, setFilters] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('bp_wh_filters')) || { brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '' }; }
+    catch { return { brand: '', series: '', cpu: '', ram: '', gpu: '', storage: '', color: '', screen: '', touch: '', hot: '' }; }
+  });
   const [sort, setSort] = useState({ col: 'brand', dir: 1 });
   const { can } = useAuth();
   const { badgeClass } = useStatuses();
@@ -43,6 +46,8 @@ export default function Warehouse() {
     api.get('/settings/public-rate').then(r => setRate(r.data.rate));
   }
   useEffect(load, []);
+  useEffect(() => { sessionStorage.setItem('bp_wh_search', search); }, [search]);
+  useEffect(() => { sessionStorage.setItem('bp_wh_filters', JSON.stringify(filters)); }, [filters]);
 
   // Поиск по серийным номерам — с задержкой, чтобы не долбить сервер на каждую букву
   useEffect(() => {

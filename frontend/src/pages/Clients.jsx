@@ -17,8 +17,8 @@ export default function Clients() {
   const [managers, setManagers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [search, setSearch] = useState(() => sessionStorage.getItem('bp_clients_search') || '');
+  const [categoryFilter, setCategoryFilter] = useState(() => sessionStorage.getItem('bp_clients_category') || 'all');
   const [sort, setSort] = useState('recent');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
@@ -34,6 +34,8 @@ export default function Clients() {
     api.get('/clients/managers-list').then(r => setManagers(r.data));
   }
   useEffect(load, []);
+  useEffect(() => { sessionStorage.setItem('bp_clients_search', search); }, [search]);
+  useEffect(() => { sessionStorage.setItem('bp_clients_category', categoryFilter); }, [categoryFilter]);
 
   async function submit(e) {
     e.preventDefault();
