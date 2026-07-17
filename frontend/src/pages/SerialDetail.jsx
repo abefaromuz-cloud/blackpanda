@@ -11,9 +11,14 @@ import { useTT } from '../i18n/useTT';
 export default function SerialDetail() {
   const { id } = useParams();
   const [s, setS] = useState(null);
+  const [notesBuffer, setNotesBuffer] = useState('');
   const [showReturn, setShowReturn] = useState(false);
   const [reason, setReason] = useState('');
   const [newStatus, setNewStatus] = useState('');
+  const [pendingSoldStatus, setPendingSoldStatus] = useState(null); // статус со счётом "sold", ждущий выбора клиента
+  const [soldClientId, setSoldClientId] = useState('');
+  const [soldDate, setSoldDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [clients, setClients] = useState([]);
   const { can } = useAuth();
   const { t } = useLang();
   const { statuses, badgeClass, bucketOf, displayLabel } = useStatuses();
@@ -21,11 +26,35 @@ export default function SerialDetail() {
   const tt = useTT();
   const canEdit = can('warehouse', 'edit');
 
-  function load() { api.get(`/serials/detail/${id}`).then(r => setS(r.data)); }
+  function load() { api.get(`/serials/detail/${id}`).then(r => { setS(r.data); setNotesBuffer(r.data.notes || ''); }); }
   useEffect(load, [id]);
 
+  async function saveNotes() {
+    if (notesBuffer === (s.notes || '')) return; // ничего не поменялось — не дёргаем сервер зря
+    await api.put(`/serials/${id}`, { notes: notesBuffer });
+    setS(prev => ({ ...prev, notes: notesBuffer }));
+  }
+
   async function changeStatus(status_id) {
+    if (bucketOf(status_id) === 'sold') {
+      // Продажа "напрямую" из карточки серийника — обычно для внесения старых архивных продаж
+      // задним числом. Спрашиваем, кому продано, прежде чем менять статус.
+      setPendingSoldStatus(status_id);
+      setSoldClientId(s.sale_client_id || '');
+      if (!clients.length) api.get('/clients').then(r => setClients(r.data));
+      return;
+    }
     await api.put(`/serials/${id}`, { status_id });
+    load();
+  }
+
+  async function confirmSold() {
+    await api.put(`/serials/${id}`, {
+      status_id: pendingSoldStatus,
+      sale_client_id: soldClientId || null,
+      sale_date: soldDate ? new Date(soldDate).toISOString() : null,
+    });
+    setPendingSoldStatus(null);
     load();
   }
 
@@ -102,6 +131,20 @@ export default function SerialDetail() {
               {statuses.map(st => <option key={st.id} value={st.label}>{displayLabel(st.label)}</option>)}
             </select>
           ) : <div className="text-sm"><span className={`badge ${badgeClass(s.status_id)}`}>{displayLabel(s.status_id)}</span></div>}
+          {pendingSoldStatus && (
+            <div className="bg-bg3 rounded-xl p-3 mb-2">
+              <div className="text-xs font-bold mb-2">👤 {tt("Кому продано?")}</div>
+              <select className="inp mb-2" value={soldClientId} onChange={e => setSoldClientId(e.target.value)}>
+                <option value="">— {tt("без клиента")} —</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input className="inp mb-2" type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)} />
+              <div className="flex gap-2">
+                <button className="btn btn-primary btn-sm" onClick={confirmSold}>{tt("Подтвердить продажу")}</button>
+                <button className="text-text3 text-xs hover:text-text" onClick={() => setPendingSoldStatus(null)}>{t('cancel')}</button>
+              </div>
+            </div>
+          )}
           {s.client_name && <div className="text-xs text-text3 mt-1">{tt("Клиент")}: <Link to={`/clients/${s.sale_client_id}`} className="text-accent2 hover:underline">{s.client_name} →</Link></div>}
 
           <div className="mt-3">
@@ -123,7 +166,7 @@ export default function SerialDetail() {
 
         <div className="card">
           <div className="font-bold text-sm mb-3">{tt("Заметки / причина")}</div>
-          <textarea className="inp mb-3" rows={4} disabled={!canEdit} value={s.notes || ''} onChange={e => updateField('notes', e.target.value)} />
+          <textarea className="inp mb-3" rows={4} disabled={!canEdit} value={notesBuffer} onChange={e => setNotesBuffer(e.target.value)} onBlur={saveNotes} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" disabled={!canEdit} checked={s.warranty_notify} onChange={e => updateField('warranty_notify', e.target.checked)} />
             {tt("Уведомления гарантии")}
