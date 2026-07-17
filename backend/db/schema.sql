@@ -1011,3 +1011,8 @@ ALTER TABLE laptops ADD COLUMN IF NOT EXISTS public_share_enabled BOOLEAN NOT NU
 CREATE INDEX IF NOT EXISTS idx_sale_items_laptop ON sale_items(laptop_id);
 CREATE INDEX IF NOT EXISTS idx_price_history_laptop ON price_history(laptop_id, changed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
+
+-- Ремонт может идти по двум разным путям: отправка в Китай (длинная цепочка) или починка
+-- своими силами на месте (короткая цепочка) — для несложных проблем. По умолчанию — китай,
+-- чтобы не менять поведение уже существующих заявок.
+ALTER TABLE service_order_items ADD COLUMN IF NOT EXISTS repair_location TEXT NOT NULL DEFAULT 'china';

@@ -12,6 +12,8 @@ const STAGES = {
   sent_cn: { ru: 'Отправлен в Китай', zh: '已发往中国', ico: '✈️' },
   in_repair: { ru: 'На ремонте в Китае', zh: '维修中', ico: '🔧' },
   returning: { ru: 'Возвращается из Китая', zh: '回程中', ico: '📬' },
+  awaiting_repair: { ru: 'Ожидает ремонта', zh: '等待维修', ico: '🕒' },
+  repairing_local: { ru: 'Ремонтируется у нас', zh: '本地维修中', ico: '🛠️' },
   ready: { ru: 'Готов к выдаче — свяжитесь с нами для получения', zh: '可取件，请联系我们', ico: '✅' },
   done: { ru: 'Выдан клиенту', zh: '已交付', ico: '🏁' },
 };
@@ -52,7 +54,7 @@ router.get('/', authenticate, requirePermission('service', 'view'), async (req, 
           'id', soi.id, 'kind', soi.kind, 'serial_id', soi.serial_id, 'device_label', soi.device_label,
           'issue', soi.issue, 'is_warranty', soi.is_warranty, 'cost_cny', soi.cost_cny,
           'technician', soi.technician, 'stage', soi.status, 'return_status', soi.return_status,
-          'tracking', soi.tracking, 'expected_date', soi.expected_date,
+          'tracking', soi.tracking, 'expected_date', soi.expected_date, 'repair_location', soi.repair_location,
           'serial', s.serial, 'brand', l.brand, 'series', l.series,
           'cpu', l.cpu, 'ram', l.ram, 'gpu', l.gpu, 'storage', l.storage, 'color', l.color, 'screen', l.screen,
           'created_at', soi.created_at, 'image_url', l.image_url,
@@ -97,10 +99,10 @@ router.post('/', authenticate, requirePermission('service', 'edit'), async (req,
       if (it.kind === 'own_stock' && !it.serial_id) continue;
       if (it.kind !== 'own_stock' && !it.device_label) continue;
       const itemRes = await client.query(
-        `INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'received') RETURNING *`,
+        `INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date, status, repair_location)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'received',$10) RETURNING *`,
         [order.rows[0].id, it.kind || 'external', it.kind === 'own_stock' ? it.serial_id : null,
-         it.kind === 'own_stock' ? null : it.device_label, it.issue || null, !!it.is_warranty, it.cost_cny || 0, it.technician || null, it.expected_date || null]
+         it.kind === 'own_stock' ? null : it.device_label, it.issue || null, !!it.is_warranty, it.cost_cny || 0, it.technician || null, it.expected_date || null, it.repair_location || 'china']
       );
       await client.query('INSERT INTO service_item_history (service_item_id, stage, note) VALUES ($1,$2,$3)', [itemRes.rows[0].id, 'received', 'Принято на ремонт']);
       if (it.kind === 'own_stock' && it.serial_id) {
@@ -121,15 +123,15 @@ router.post('/', authenticate, requirePermission('service', 'edit'), async (req,
 
 // Добавить позицию в уже существующую заявку
 router.post('/:id/items', authenticate, requirePermission('service', 'edit'), async (req, res) => {
-  const { kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date } = req.body;
+  const { kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date, repair_location } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'received') RETURNING *`,
+      `INSERT INTO service_order_items (service_order_id, kind, serial_id, device_label, issue, is_warranty, cost_cny, technician, expected_date, status, repair_location)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'received',$10) RETURNING *`,
       [req.params.id, kind || 'external', kind === 'own_stock' ? serial_id : null,
-       kind === 'own_stock' ? null : device_label, issue || null, !!is_warranty, cost_cny || 0, technician || null, expected_date || null]
+       kind === 'own_stock' ? null : device_label, issue || null, !!is_warranty, cost_cny || 0, technician || null, expected_date || null, repair_location || 'china']
     );
     await client.query('INSERT INTO service_item_history (service_item_id, stage, note) VALUES ($1,$2,$3)', [result.rows[0].id, 'received', 'Принято на ремонт']);
     if (kind === 'own_stock' && serial_id) {
@@ -161,17 +163,17 @@ router.put('/:id', authenticate, requirePermission('service', 'edit'), async (re
 // "Отправлен в Китай" можно указать трек-номер; на "Выдан клиенту" — статус, в котором серийник
 // возвращается на склад. Клиенту автоматически уходит уведомление о новом этапе.
 router.put('/:id/items/:itemId', authenticate, requirePermission('service', 'edit'), async (req, res) => {
-  const { stage, cost_cny, technician, is_warranty, issue, tracking, expected_date, return_status } = req.body;
+  const { stage, cost_cny, technician, is_warranty, issue, tracking, expected_date, return_status, repair_location } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const result = await client.query(
       `UPDATE service_order_items SET status=COALESCE($1,status), cost_cny=COALESCE($2,cost_cny),
        technician=COALESCE($3,technician), is_warranty=COALESCE($4,is_warranty), issue=COALESCE($5,issue),
-       tracking=COALESCE($6,tracking), expected_date=COALESCE($7,expected_date)
-       WHERE id=$8 AND service_order_id=$9 RETURNING *`,
+       tracking=COALESCE($6,tracking), expected_date=COALESCE($7,expected_date), repair_location=COALESCE($8,repair_location)
+       WHERE id=$9 AND service_order_id=$10 RETURNING *`,
       [stage || null, cost_cny ?? null, technician || null, is_warranty ?? null, issue || null,
-       tracking || null, expected_date || null, req.params.itemId, req.params.id]
+       tracking || null, expected_date || null, repair_location || null, req.params.itemId, req.params.id]
     );
     const item = result.rows[0];
     if (!item) throw { status: 404, message: 'Позиция не найдена' };

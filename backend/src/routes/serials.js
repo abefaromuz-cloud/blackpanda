@@ -105,13 +105,14 @@ router.post('/bulk', authenticate, requirePermission('warehouse', 'edit'), async
 });
 
 router.put('/:id', authenticate, requirePermission('warehouse', 'edit'), async (req, res) => {
-  const { status_id, notes, warranty_months, warranty_notify, arrival_date, sale_date, history_note } = req.body;
+  const { status_id, notes, warranty_months, warranty_notify, arrival_date, sale_date, history_note, sale_client_id } = req.body;
   try {
     const result = await pool.query(
       `UPDATE serials SET status_id=COALESCE($1,status_id), notes=COALESCE($2,notes), warranty_months=COALESCE($3,warranty_months),
-        warranty_notify=COALESCE($4,warranty_notify), arrival_date=COALESCE($5,arrival_date), sale_date=COALESCE($6,sale_date)
-       WHERE id=$7 RETURNING *`,
-      [status_id||null, notes ?? null, warranty_months||null, warranty_notify ?? null, arrival_date||null, sale_date||null, req.params.id]
+        warranty_notify=COALESCE($4,warranty_notify), arrival_date=COALESCE($5,arrival_date), sale_date=COALESCE($6,sale_date),
+        sale_client_id=COALESCE($7,sale_client_id)
+       WHERE id=$8 RETURNING *`,
+      [status_id||null, notes ?? null, warranty_months||null, warranty_notify ?? null, arrival_date||null, sale_date||null, sale_client_id||null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Не найден' });
     if (status_id) {
