@@ -300,6 +300,22 @@ export default function Scan() {
                 {client && <label className="flex items-center gap-1"><input type="radio" checked={paymentMode === 'balance'} onChange={() => setPaymentMode('balance')} /> {t('paymentBalance')} ({Math.round(client.balance_rub || 0).toLocaleString('ru-RU')} ₽)</label>}
               </div>
 
+              {paymentMode === 'balance' && client && (
+                <div className="text-xs bg-bg3 rounded-lg p-2 max-w-md">
+                  {(() => {
+                    const bal = Number(client.balance_rub || 0);
+                    const fromBalance = Math.min(bal, finalRub);
+                    const remainder = finalRub - fromBalance;
+                    return (
+                      <>
+                        <div>{tt('С баланса спишется')}: <b className="text-green">{Math.round(fromBalance).toLocaleString('ru-RU')} ₽</b></div>
+                        {remainder > 0.5 && <div>{tt('Баланса не хватает, в долг уйдёт')}: <b className="text-red">{Math.round(remainder).toLocaleString('ru-RU')} ₽</b></div>}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
               {paymentMode === 'full' && (
                 <select className="inp max-w-xs" value={payDest} onChange={e => setPayDest(e.target.value)}>
                   <option value="cash">{t('payDestCash')}</option>
@@ -322,6 +338,10 @@ export default function Scan() {
                       {banks.map(b => <option key={b.key} value={b.key}>{b.name}</option>)}
                     </select>
                   </div>
+                  <div className={`col-span-2 text-xs ${Math.abs((Number(splitCash) || 0) + (Number(splitBank) || 0) - finalRub) > 1 ? 'text-red' : 'text-green'}`}>
+                    {tt('Введено')}: {Math.round((Number(splitCash) || 0) + (Number(splitBank) || 0)).toLocaleString('ru-RU')} ₽ {tt('из')} {Math.round(finalRub).toLocaleString('ru-RU')} ₽
+                    {Math.abs((Number(splitCash) || 0) + (Number(splitBank) || 0) - finalRub) > 1 && ` — ${tt('не сходится!')}`}
+                  </div>
                 </div>
               )}
             </div>
@@ -330,7 +350,7 @@ export default function Scan() {
               <button className="btn btn-secondary" onClick={() => setStep(2)}>← {t('back')}</button>
               <div className="flex gap-2">
                 <button className="btn btn-secondary" onClick={confirmReserve}>🔒 {t('reserve')}</button>
-                <button className="btn btn-primary" onClick={confirmSale}>✓ {t('confirmSale')}</button>
+                <button className="btn btn-primary" onClick={confirmSale} disabled={paymentMode === 'split' && Math.abs((Number(splitCash) || 0) + (Number(splitBank) || 0) - finalRub) > 1}>✓ {t('confirmSale')}</button>
               </div>
             </div>
           </div>

@@ -43,7 +43,7 @@ export default function Layout() {
   const [order, setOrder] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileRate, setMobileRate] = useState(null);
-  useEffect(() => { api.get('/settings/public-rate').then(r => setMobileRate(r.data.rate)); }, []);
+  useEffect(() => { api.get('/settings/public-rate').then(r => setMobileRate(r.data.rate)); }, [location.pathname]);
   const [theme, setTheme] = useState(() => localStorage.getItem('bp_theme') || 'dark');
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, DollarSign } from 'lucide-react';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -9,6 +9,7 @@ import { useTT } from '../i18n/useTT';
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, can } = useAuth();
   const { lang } = useLang();
   const tt = useTT();
@@ -23,7 +24,7 @@ export default function Header() {
   });
   const boxRef = useRef(null);
 
-  useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, []);
+  useEffect(() => { api.get('/settings/public-rate').then(r => setRate(r.data.rate)); }, [location.pathname]);
 
   useEffect(() => {
     if (!can('dashboard', 'view')) return;

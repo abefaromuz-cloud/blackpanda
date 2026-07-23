@@ -38,7 +38,11 @@ export default function ClientDetail() {
   }
   if (!c) return <div className="text-text3">{t('loading')}</div>;
 
-  const openDebts = c.debts.filter(d => d.status === 'open');
+  const openDebts = c.debts.filter(d => {
+    if (d.status !== 'open') return false;
+    const remaining = d.amount_cny ? Number(d.amount_cny) - Number(d.amount_paid_cny) : Number(d.amount_rub) - Number(d.amount_paid_rub);
+    return remaining > 0.01; // защита от уже некорректных долгов с отрицательным/нулевым остатком
+  });
   const totalDebt = openDebts.reduce((s, d) => {
     if (d.amount_cny) return s + (Number(d.amount_cny) - Number(d.amount_paid_cny)) * rate;
     return s + (Number(d.amount_rub) - Number(d.amount_paid_rub));
@@ -84,20 +88,24 @@ export default function ClientDetail() {
 
   async function editDebt(debt) {
     if (debt.amount_cny) {
-      const input = prompt(`${tt('Новая сумма долга')} (¥):`, debt.amount_cny);
+      const input = prompt(`${tt('Новая ОБЩАЯ сумма долга (¥). Уже оплачено')}: ¥${debt.amount_paid_cny} — ${tt('новая сумма не может быть меньше')}:`, debt.amount_cny);
       if (input === null) return;
       const amount = Number(input);
       if (!amount || amount <= 0) return;
-      await api.put(`/clients/${id}/debts/${debt.id}`, { amount_cny: amount });
-      load();
+      try {
+        await api.put(`/clients/${id}/debts/${debt.id}`, { amount_cny: amount });
+        load();
+      } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); }
       return;
     }
-    const input = prompt('Новая сумма долга (₽):', debt.amount_rub);
+    const input = prompt(`${tt('Новая ОБЩАЯ сумма долга (₽). Уже оплачено')}: ${debt.amount_paid_rub} ₽ — ${tt('новая сумма не может быть меньше')}:`, debt.amount_rub);
     if (input === null) return;
     const amount = Number(input);
     if (!amount || amount <= 0) return;
-    await api.put(`/clients/${id}/debts/${debt.id}`, { amount_rub: amount });
-    load();
+    try {
+      await api.put(`/clients/${id}/debts/${debt.id}`, { amount_rub: amount });
+      load();
+    } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); }
   }
 
   async function remind(debtId) {
