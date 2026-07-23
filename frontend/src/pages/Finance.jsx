@@ -36,7 +36,7 @@ export default function Finance() {
 
       {canEdit && (
         <div className="grid md:grid-cols-2 gap-4 mb-5">
-          <OperationBlock clients={clients} banks={banks} onDone={load} />
+          <OperationBlock clients={clients} debtors={d.debtors} banks={banks} onDone={load} />
           <DayCloseBlock onDone={load} />
         </div>
       )}
@@ -72,10 +72,13 @@ export default function Finance() {
         <div className="font-bold text-sm mb-3">📋 {tt("Последние операции")}</div>
         {d.recentOps.length === 0 && <div className="text-text3 text-sm">—</div>}
         {d.recentOps.map(op => (
-          <div key={op.id} className="flex justify-between text-sm py-1.5 border-b border-border last:border-0">
-            <span className="text-text3">{new Date(op.created_at).toLocaleString('ru-RU')}</span>
-            <span>{op.note} {op.recipient && `· ${op.recipient}`} {op.client_name && `· ${op.client_name}`}</span>
-            <span className={`font-mono ${op.type === 'in' ? 'text-green' : 'text-red'}`}>{op.type === 'in' ? '+' : '-'}{Math.round(op.amount_rub).toLocaleString('ru-RU')} ₽</span>
+          <div key={op.id} className="flex justify-between items-baseline gap-3 text-sm py-1.5 border-b border-border last:border-0">
+            <span className="min-w-0 truncate">
+              <span className="text-text3">{new Date(op.created_at).toLocaleString('ru-RU')}</span>
+              {' — '}
+              <span>{op.note} {op.recipient && `· ${op.recipient}`} {op.client_name && `· ${op.client_name}`}</span>
+            </span>
+            <span className={`font-mono flex-shrink-0 ${op.type === 'in' ? 'text-green' : 'text-red'}`}>{op.type === 'in' ? '+' : '-'}{Math.round(op.amount_rub).toLocaleString('ru-RU')} ₽</span>
           </div>
         ))}
         <Link to="/cash" className="block text-center text-accent2 text-sm mt-3 hover:underline">{tt("Показать всю историю операций")} →</Link>
@@ -84,7 +87,7 @@ export default function Finance() {
   );
 }
 
-function OperationBlock({ clients, banks, onDone }) {
+function OperationBlock({ clients, debtors, banks, onDone }) {
   const tt = useTT();
   const ACTIONS = [
     ['op', tt('Операция (приход/расход/обменник)')],
@@ -190,9 +193,12 @@ function OperationBlock({ clients, banks, onDone }) {
 
       {(action === 'topup' || action === 'debt' || action === 'payoff') && (
         <select className="inp mb-3" value={clientId} onChange={e => setClientId(e.target.value)} required>
-          <option value="">— {tt("выбери клиента")} —</option>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="">— {tt(action === 'payoff' ? "выбери должника" : "выбери клиента")} —</option>
+          {(action === 'payoff' ? debtors : clients).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+      )}
+      {action === 'payoff' && debtors.length === 0 && (
+        <div className="text-text3 text-xs mb-3">{tt("Должников нет — гасить нечего")}</div>
       )}
 
       {action === 'debt' && (

@@ -4,7 +4,6 @@ import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useStatuses } from '../hooks/useStatuses';
-import PriceSparkline from '../components/PriceSparkline';
 import { useLibraryText } from '../hooks/useLibraryText';
 import { useTT } from '../i18n/useTT';
 
@@ -434,10 +433,7 @@ export default function Warehouse() {
                         )}
                       </td>
                       <td className="py-2 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
-                          <PriceSparkline points={l.price_sparkline} trend={l.price_trend} />
-                        </div>
+                        <span className="font-mono text-yellow font-bold">¥{l.price_sell_cny}</span>
                       </td>
                       <td className="py-2 text-xs text-text3 font-mono px-3">{rate}</td>
                       <td className="py-2 pr-4 text-xs text-text3 font-mono px-3">{Math.round(l.price_sell_cny * rate).toLocaleString('ru-RU')} ₽</td>

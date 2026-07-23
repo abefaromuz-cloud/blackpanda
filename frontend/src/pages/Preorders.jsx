@@ -99,7 +99,11 @@ export default function Preorders() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                   <select className="inp" value={it.laptop_id} onChange={e => updateItem(i, { laptop_id: e.target.value })} required>
                     <option value="">{t('model')}</option>
-                    {laptops.map(l => <option key={l.id} value={l.id}>{l.brand} {l.series}</option>)}
+                    {laptops.map(l => (
+                      <option key={l.id} value={l.id}>
+                        {l.brand} {l.series} — {[l.cpu, l.ram, l.storage, l.gpu, l.color, l.touch === 'yes' ? 'сенсор' : null].filter(Boolean).join(' / ')}
+                      </option>
+                    ))}
                   </select>
                   <input className="inp" type="number" min="1" placeholder={t('qty')} value={it.qty} onChange={e => updateItem(i, { qty: e.target.value })} />
                   <input className="inp" type="number" placeholder={t('costPrice') + ' ¥'} value={it.cost_cny} onChange={e => updateItem(i, { cost_cny: e.target.value })} />
