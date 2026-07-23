@@ -130,11 +130,14 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
       await client.query('UPDATE clients SET balance_rub=$1 WHERE id=$2', [newBalance, client_id]);
       await client.query('INSERT INTO balance_history (client_id, amount_rub, note, balance_after_rub) VALUES ($1,$2,$3,$4)',
         [client_id, -fromBalance, 'Оплата продажи с баланса', newBalance]);
-      if (remainder > 0) {
-        // остаток — наличными в кассу
-        await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [remainder]);
-        await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Доплата наличными к продаже (баланс не покрыл)',$2,'other')`,
-          [remainder, client_id]);
+      if (remainder > 0.5) {
+        // Баланса не хватило — остаток честно уходит в долг (в юанях, как и остальные долги),
+        // а не тихо считается "как будто уже оплачено наличными"
+        const remainderCny = Math.round((remainder / rate) * 100) / 100;
+        await client.query(
+          'INSERT INTO debts (client_id, sale_id, amount_rub, amount_cny, due_date) VALUES ($1,$2,$3,$4,$5)',
+          [client_id, sale.rows[0].id, remainder, remainderCny, due_date || null]
+        );
       }
     } else if (mode === 'partial') {
       const paidNow = Math.max(0, Math.min(finalRub, Number(paid_now_rub) || 0));
@@ -157,6 +160,11 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
       const cash = Math.max(0, Number(split_cash) || 0);
       const bank = Math.max(0, Number(split_bank) || 0);
       const bankKey = bank_dest || 'sber';
+      // Наличные + перевод обязаны сходиться с итоговой ценой — иначе разница молча пропадала
+      // бы из учёта (не долг, не расход, просто исчезала бы)
+      if (Math.abs((cash + bank) - finalRub) > 1) {
+        throw { status: 400, message: `Наличные + перевод (${Math.round(cash + bank).toLocaleString('ru-RU')} ₽) не сходится с итоговой ценой (${Math.round(finalRub).toLocaleString('ru-RU')} ₽)` };
+      }
       if (cash > 0) {
         await client.query('UPDATE settings SET cash_balance_rub = cash_balance_rub + $1 WHERE id=1', [cash]);
         await client.query(`INSERT INTO cash_log (type, amount_rub, note, client_id, category) VALUES ('in',$1,'Продажа (наличные)',$2,'other')`, [cash, client_id || null]);

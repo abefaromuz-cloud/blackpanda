@@ -307,6 +307,17 @@ router.post('/:id/debts/:debtId/pay', authenticate, requirePermission('finance',
 // Редактировать сумму долга вручную (например, скорректировать ошибку)
 router.put('/:id/debts/:debtId', authenticate, requirePermission('finance', 'edit'), async (req, res) => {
   const { amount_rub, amount_cny, due_date } = req.body;
+  const existing = await pool.query('SELECT * FROM debts WHERE id=$1 AND client_id=$2', [req.params.debtId, req.params.id]);
+  if (!existing.rows[0]) return res.status(404).json({ error: 'Долг не найден' });
+  const d = existing.rows[0];
+  // Нельзя отредактировать долг на сумму меньше того, что уже оплачено — иначе остаток уйдёт
+  // в минус, и такой долг "спрячет" реальную задолженность в общих списках должников
+  if (amount_cny !== undefined && amount_cny !== null && Number(amount_cny) < Number(d.amount_paid_cny)) {
+    return res.status(400).json({ error: `Нельзя поставить сумму меньше уже оплаченной (¥${d.amount_paid_cny}). Если хочешь закрыть долг — используй «Погасить полностью».` });
+  }
+  if (amount_rub !== undefined && amount_rub !== null && Number(amount_rub) < Number(d.amount_paid_rub)) {
+    return res.status(400).json({ error: `Нельзя поставить сумму меньше уже оплаченной (${d.amount_paid_rub} ₽). Если хочешь закрыть долг — используй «Погасить полностью».` });
+  }
   const result = await pool.query(
     'UPDATE debts SET amount_rub=COALESCE($1,amount_rub), amount_cny=COALESCE($2,amount_cny), due_date=COALESCE($3,due_date) WHERE id=$4 AND client_id=$5 RETURNING *',
     [amount_rub || null, amount_cny || null, due_date || null, req.params.debtId, req.params.id]

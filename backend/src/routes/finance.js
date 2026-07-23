@@ -32,14 +32,14 @@ router.get('/', authenticate, requirePermission('finance', 'view'), async (req, 
       // Должники — долг в юанях и долг в рублях у одного клиента показываем раздельно
       pool.query(`
         SELECT c.id, c.name,
-          COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) AS debt_rub,
-          COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) AS debt_cny
+          COALESCE(SUM(GREATEST(d.amount_rub - d.amount_paid_rub, 0)) FILTER (WHERE d.amount_cny IS NULL), 0) AS debt_rub,
+          COALESCE(SUM(GREATEST(d.amount_cny - d.amount_paid_cny, 0)) FILTER (WHERE d.amount_cny IS NOT NULL), 0) AS debt_cny
         FROM clients c JOIN debts d ON d.client_id = c.id AND d.status='open'
         GROUP BY c.id, c.name
-        HAVING COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0) > 0
-            OR COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) > 0
-        ORDER BY (COALESCE(SUM(d.amount_rub - d.amount_paid_rub) FILTER (WHERE d.amount_cny IS NULL), 0)
-          + COALESCE(SUM(d.amount_cny - d.amount_paid_cny) FILTER (WHERE d.amount_cny IS NOT NULL), 0) * (SELECT rate FROM settings WHERE id=1)) DESC
+        HAVING COALESCE(SUM(GREATEST(d.amount_rub - d.amount_paid_rub, 0)) FILTER (WHERE d.amount_cny IS NULL), 0) > 0
+            OR COALESCE(SUM(GREATEST(d.amount_cny - d.amount_paid_cny, 0)) FILTER (WHERE d.amount_cny IS NOT NULL), 0) > 0
+        ORDER BY (COALESCE(SUM(GREATEST(d.amount_rub - d.amount_paid_rub, 0)) FILTER (WHERE d.amount_cny IS NULL), 0)
+          + COALESCE(SUM(GREATEST(d.amount_cny - d.amount_paid_cny, 0)) FILTER (WHERE d.amount_cny IS NOT NULL), 0) * (SELECT rate FROM settings WHERE id=1)) DESC
       `),
       // Сколько всего передано каждому обменнику
       pool.query(`
