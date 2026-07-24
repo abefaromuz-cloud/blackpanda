@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
+import { translateNote } from '../utils/translateNote';
 
 // Эта страница специально не выведена в левое меню — открывается по кнопке
 // «Показать всю историю операций» со страницы Финансы.
@@ -59,7 +60,7 @@ export default function Cash() {
                 <td className={`py-2 font-mono ${l.type === 'in' ? 'text-green' : 'text-red'}`}>
                   {l.type === 'in' ? '+' : '-'}{Math.round(l.amount_rub).toLocaleString('ru-RU')} ₽
                 </td>
-                <td className="py-2 text-text3">{l.note} {l.recipient && `· ${l.recipient}`} {l.client_name && `· ${l.client_name}`}</td>
+                <td className="py-2 text-text3">{translateNote(l.note, tt)} {l.recipient && `· ${l.recipient}`} {l.client_name && `· ${l.client_name}`}</td>
               </tr>
             ))}
           </tbody>

@@ -18,6 +18,8 @@ export default function ClientDetail() {
   const [adjustAmount, setAdjustAmount] = useState('');
   const [payAmounts, setPayAmounts] = useState({});
   const [editing, setEditing] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [managers, setManagers] = useState([]);
   const [wishlist, setWishlist] = useState([]);
@@ -117,7 +119,7 @@ export default function ClientDetail() {
     setEditForm({
       name: c.name, phone: c.phone || '', telegram: c.telegram || '', city: c.city || '',
       category: c.category, discount_percent: c.discount_percent, manager_id: c.manager_id || '', avatar_url: c.avatar_url || '',
-      source: c.source || '',
+      source: c.source || '', avito_shop: c.avito_shop || '',
     });
     setEditing(true);
   }
@@ -125,6 +127,16 @@ export default function ClientDetail() {
     e.preventDefault();
     await api.put(`/clients/${id}`, editForm);
     setEditing(false); load();
+  }
+
+  async function addNote() {
+    if (!noteText.trim()) return;
+    setSavingNote(true);
+    try {
+      await api.post(`/clients/${id}/notes`, { type: 'comment', text: noteText.trim() });
+      setNoteText('');
+      load();
+    } catch (e2) { alert(e2.response?.data?.error || 'Ошибка'); } finally { setSavingNote(false); }
   }
 
   function newSale() {
@@ -156,6 +168,7 @@ export default function ClientDetail() {
                 {c.phone && <span>· {c.phone} </span>}
                 {c.city && <span>· 📍 {c.city}</span>}
                 {c.source && <span>· 🔗 {tt({ avito: 'Avito', wordofmouth: 'Сарафан', telegram: 'Telegram', marketplace: 'Маркетплейс', other: 'Другое' }[c.source] || c.source)}</span>}
+                {c.avito_shop && <span>· 🛍️ {c.avito_shop}</span>}
               </div>
               <div className="text-xs text-text3 mt-1">{daysAgo === null ? tt('Покупок ещё не было') : daysAgo === 0 ? tt('Последняя покупка сегодня') : `Последняя покупка ${daysAgo} дн. назад`}</div>
             </div>
@@ -178,6 +191,7 @@ export default function ClientDetail() {
               {managers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
             <input className="inp" placeholder={tt("Ссылка на фото (аватар)")} value={editForm.avatar_url} onChange={e => setEditForm(f => ({ ...f, avatar_url: e.target.value }))} />
+            <input className="inp" placeholder={tt("Авито")} value={editForm.avito_shop} onChange={e => setEditForm(f => ({ ...f, avito_shop: e.target.value }))} />
             <select className="inp" value={editForm.source} onChange={e => setEditForm(f => ({ ...f, source: e.target.value }))}>
               <option value="">{tt("Откуда пришёл")}</option>
               <option value="avito">Avito</option><option value="wordofmouth">{tt("Сарафан")}</option>
@@ -190,6 +204,29 @@ export default function ClientDetail() {
             </div>
           </form>
         )}
+      </div>
+
+      <div className="card mb-4">
+        <div className="font-bold text-sm mb-3">📝 {tt("Заметки о клиенте")}</div>
+        {canEdit && (
+          <div className="flex gap-2 mb-3">
+            <input
+              className="inp flex-1" placeholder={tt("Например: пришёл с Авито, торговался, забирает через друга...")}
+              value={noteText} onChange={e => setNoteText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addNote()}
+            />
+            <button className="btn btn-primary btn-sm" onClick={addNote} disabled={!noteText.trim() || savingNote}>
+              {savingNote ? tt('Сохраняю...') : t('save')}
+            </button>
+          </div>
+        )}
+        {(!c.notes || c.notes.length === 0) && <div className="text-text3 text-sm">{tt("Заметок пока нет")}</div>}
+        {c.notes && c.notes.map(n => (
+          <div key={n.id} className="text-sm py-1.5 border-b border-border last:border-0">
+            <div>{n.text}</div>
+            <div className="text-[11px] text-text3 mt-0.5">{new Date(n.created_at).toLocaleString('ru-RU')}{n.created_by_name && ` · ${n.created_by_name}`}</div>
+          </div>
+        ))}
       </div>
 
       {canEdit && (

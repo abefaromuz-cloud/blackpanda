@@ -5,6 +5,7 @@ import StatCard from '../components/StatCard';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
+import { translateNote } from '../utils/translateNote';
 
 export default function Finance() {
   const [d, setD] = useState(null);
@@ -76,7 +77,7 @@ export default function Finance() {
             <span className="min-w-0 truncate">
               <span className="text-text3">{new Date(op.created_at).toLocaleString('ru-RU')}</span>
               {' — '}
-              <span>{op.note} {op.recipient && `· ${op.recipient}`} {op.client_name && `· ${op.client_name}`}</span>
+              <span>{translateNote(op.note, tt)} {op.recipient && `· ${op.recipient}`} {op.client_name && `· ${op.client_name}`}</span>
             </span>
             <span className={`font-mono flex-shrink-0 ${op.type === 'in' ? 'text-green' : 'text-red'}`}>{op.type === 'in' ? '+' : '-'}{Math.round(op.amount_rub).toLocaleString('ru-RU')} ₽</span>
           </div>

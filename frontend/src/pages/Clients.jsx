@@ -9,7 +9,7 @@ import { useTT } from '../i18n/useTT';
 const CATEGORY_LABEL_RU = { retail: 'Розница', wholesale: 'Опт', vip: 'VIP' };
 const CATEGORY_BADGE = { retail: 'badge-blue', wholesale: 'badge-purple', vip: 'badge-yellow' };
 
-const emptyForm = { name: '', phone: '', telegram: '', city: '', category: 'retail', discount_percent: 0, manager_id: '', source: '' };
+const emptyForm = { name: '', phone: '', telegram: '', city: '', category: 'retail', discount_percent: 0, manager_id: '', source: '', avito_shop: '' };
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -103,6 +103,7 @@ export default function Clients() {
           <input className="inp" placeholder={t('name')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           <input className="inp" placeholder={t('phone')} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
           <input className="inp" placeholder="Telegram (@username)" value={form.telegram} onChange={e => setForm(f => ({ ...f, telegram: e.target.value }))} />
+          <input className="inp" placeholder={tt("Авито")} value={form.avito_shop} onChange={e => setForm(f => ({ ...f, avito_shop: e.target.value }))} />
           <input className="inp" placeholder={tt("Город")} value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
           <select className="inp" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
             <option value="retail">{tt("Розница")}</option><option value="wholesale">{tt("Опт")}</option><option value="vip">VIP</option>
