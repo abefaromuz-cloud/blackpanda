@@ -1016,3 +1016,6 @@ CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
 -- своими силами на месте (короткая цепочка) — для несложных проблем. По умолчанию — китай,
 -- чтобы не менять поведение уже существующих заявок.
 ALTER TABLE service_order_items ADD COLUMN IF NOT EXISTS repair_location TEXT NOT NULL DEFAULT 'china';
+
+-- Название магазина на Avito у клиента — для памяти, откуда клиент и с каким магазином связан
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS avito_shop TEXT;

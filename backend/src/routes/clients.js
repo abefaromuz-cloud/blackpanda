@@ -343,13 +343,13 @@ router.post('/:id/debts/remind', authenticate, requirePermission('clients', 'edi
 });
 
 router.post('/', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
-  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source } = req.body;
+  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source, avito_shop } = req.body;
   if (!name) return res.status(400).json({ error: 'Укажите имя клиента' });
   try {
     const result = await pool.query(
-      `INSERT INTO clients (name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [name, phone||null, telegram||null, notes||null, category || 'retail', discount_percent || 0, city||null, avatar_url||null, manager_id||null, source||null]
+      `INSERT INTO clients (name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source, avito_shop)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [name, phone||null, telegram||null, notes||null, category || 'retail', discount_percent || 0, city||null, avatar_url||null, manager_id||null, source||null, avito_shop||null]
     );
     await logActivity(req.user, 'Добавлен клиент', 'client', name);
     res.status(201).json(result.rows[0]);
@@ -357,15 +357,15 @@ router.post('/', authenticate, requirePermission('clients', 'edit'), async (req,
 });
 
 router.put('/:id', authenticate, requirePermission('clients', 'edit'), async (req, res) => {
-  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source } = req.body;
+  const { name, phone, telegram, notes, category, discount_percent, city, avatar_url, manager_id, source, avito_shop } = req.body;
   try {
     const result = await pool.query(
       `UPDATE clients SET name=COALESCE($1,name), phone=COALESCE($2,phone), telegram=COALESCE($3,telegram),
        notes=COALESCE($4,notes), category=COALESCE($5,category), discount_percent=COALESCE($6,discount_percent),
        city=COALESCE($7,city), avatar_url=COALESCE($8,avatar_url), manager_id=COALESCE($9,manager_id),
-       source=COALESCE($10,source)
-       WHERE id=$11 RETURNING *`,
-      [name||null, phone||null, telegram||null, notes||null, category||null, discount_percent ?? null, city||null, avatar_url||null, manager_id||null, source||null, req.params.id]
+       source=COALESCE($10,source), avito_shop=COALESCE($11,avito_shop)
+       WHERE id=$12 RETURNING *`,
+      [name||null, phone||null, telegram||null, notes||null, category||null, discount_percent ?? null, city||null, avatar_url||null, manager_id||null, source||null, avito_shop||null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Клиент не найден' });
     res.json(result.rows[0]);
