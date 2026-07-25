@@ -29,6 +29,25 @@ const SPEC_ICONS = {
   keyboard_layout: [Keyboard, 'bg-blue-500/15 text-blue-400'],
 };
 
+// Насколько две карточки товара похожи друг на друга — чтобы система сама подсказывала
+// вероятные дубли, а не заставляла искать вручную. Нормализуем текст (без регистра/пробелов/
+// пунктуации), чтобы ловить совпадения вроде "TUF Gaming 6 FA608" и "TUF-Gaming6 FA608".
+function norm(s) { return (s || '').toLowerCase().replace(/[^a-zа-я0-9]/g, ''); }
+function similarityScore(a, b) {
+  let score = 0;
+  const brandA = norm(a.brand), brandB = norm(b.brand);
+  if (!brandA || brandA !== brandB) return 0; // разный бренд — точно не дубль, дальше не считаем
+  score += 40;
+  const seriesA = norm(a.series), seriesB = norm(b.series);
+  if (seriesA && seriesA === seriesB) score += 35;
+  else if (seriesA && seriesB && (seriesA.includes(seriesB) || seriesB.includes(seriesA))) score += 20;
+  if (a.cpu && norm(a.cpu) === norm(b.cpu)) score += 10;
+  if (a.gpu && norm(a.gpu) === norm(b.gpu)) score += 8;
+  if (a.ram && norm(a.ram) === norm(b.ram)) score += 4;
+  if (a.storage && norm(a.storage) === norm(b.storage)) score += 3;
+  return score;
+}
+
 function SpecBox({ Icon, iconClass, label, value, compact }) {
   return (
     <div className="card flex items-center gap-3 py-3">
@@ -58,6 +77,7 @@ export default function LaptopDetail() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [mergeSearch, setMergeSearch] = useState('');
+  const [manualMergeSearch, setManualMergeSearch] = useState(false);
   const [mergeTarget, setMergeTarget] = useState(null);
   const [mergeCandidates, setMergeCandidates] = useState([]);
   const [merging, setMerging] = useState(false);
@@ -89,12 +109,20 @@ export default function LaptopDetail() {
 
   useEffect(() => {
     if (!showMerge) return;
+    setManualMergeSearch(false); setMergeTarget(null); setMergeSearch('');
     api.get('/laptops').then(r => setMergeCandidates(r.data.filter(x => x.id !== id)));
   }, [showMerge, id]);
 
   const mergeResults = mergeSearch.trim().length >= 2
     ? mergeCandidates.filter(x => `${x.brand} ${x.series} ${x.cpu||''} ${x.ram||''}`.toLowerCase().includes(mergeSearch.toLowerCase())).slice(0, 8)
     : [];
+
+  // Система сама предлагает вероятных дублей — считаем похожесть по бренду/серии/начинке
+  const mergeSuggestions = l ? mergeCandidates
+    .map(x => ({ x, score: similarityScore(l, x) }))
+    .filter(({ score }) => score >= 40) // минимум — совпадающий бренд, дальше уже по совокупности
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5) : [];
 
   async function confirmMerge() {
     if (!mergeTarget) return;
@@ -280,19 +308,48 @@ export default function LaptopDetail() {
       {showMerge && (
         <div className="card mb-5">
           <div className="font-bold text-sm mb-1">🔗 {tt("Объединить с другой моделью")}</div>
-          <div className="text-xs text-text3 mb-3">{tt("Если это дубль (та же модель, но заведена второй раз, например с китайским названием) — найди оригинал, все серийники и история перенесутся туда, а эта карточка удалится.")}</div>
-          <input className="inp mb-2" placeholder={tt("Начни вводить бренд/серию оригинала...")} value={mergeSearch} onChange={e => { setMergeSearch(e.target.value); setMergeTarget(null); }} />
-          {mergeResults.length > 0 && !mergeTarget && (
-            <div className="bg-bg3 rounded-xl p-1 mb-2 max-h-48 overflow-y-auto">
-              {mergeResults.map(x => (
-                <button key={x.id} onClick={() => { setMergeTarget(x); setMergeSearch(`${x.brand} ${x.series || ''}`); }}
-                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg4 text-sm flex justify-between">
-                  <span>{x.brand} {x.series}</span>
-                  <span className="text-text3 text-xs">{x.cpu} · {x.ram} · {x.in_stock} {tt('шт.')}</span>
-                </button>
-              ))}
+          <div className="text-xs text-text3 mb-3">{tt("Если это дубль (та же модель, но заведена второй раз, например с китайским названием) — перенеси все серийники и историю на оригинал, эта карточка удалится.")}</div>
+
+          {!mergeTarget && mergeSuggestions.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[11px] uppercase font-bold text-text3 mb-1.5">🤖 {tt("Похоже, это может быть одно из этого — сверь и подтверди")}</div>
+              <div className="space-y-1.5">
+                {mergeSuggestions.map(({ x, score }) => (
+                  <div key={x.id} className="bg-bg3 rounded-xl p-2.5 flex items-center gap-2.5">
+                    <img src={x.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-11 h-11 object-contain rounded-lg bg-bg4 flex-shrink-0" alt="" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm">{x.brand} {x.series}</div>
+                      <div className="text-xs text-text3">{[x.cpu, x.ram, x.storage, x.gpu, x.color].filter(Boolean).join(' ')} · {x.in_stock} {tt('шт.')}</div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${score >= 85 ? 'bg-green/15 text-green' : score >= 60 ? 'bg-yellow/15 text-yellow' : 'bg-bg4 text-text3'}`}>
+                      {score >= 85 ? tt('очень похоже') : score >= 60 ? tt('вероятно') : tt('возможно')}
+                    </span>
+                    <button className="btn btn-secondary btn-sm flex-shrink-0" onClick={() => setMergeTarget(x)}>{tt('Это оно')}</button>
+                  </div>
+                ))}
+              </div>
+              <button className="text-text3 text-xs hover:text-text mt-2" onClick={() => setManualMergeSearch(true)}>{tt('Ничего не подходит — искать вручную')}</button>
             </div>
           )}
+
+          {!mergeTarget && (mergeSuggestions.length === 0 || manualMergeSearch) && (
+            <div className="mb-2">
+              {mergeSuggestions.length > 0 && <div className="text-[11px] uppercase font-bold text-text3 mb-1.5">{tt('Ручной поиск')}</div>}
+              <input className="inp mb-2" placeholder={tt("Начни вводить бренд/серию оригинала...")} value={mergeSearch} onChange={e => { setMergeSearch(e.target.value); setMergeTarget(null); }} />
+              {mergeResults.length > 0 && (
+                <div className="bg-bg3 rounded-xl p-1 max-h-48 overflow-y-auto">
+                  {mergeResults.map(x => (
+                    <button key={x.id} onClick={() => { setMergeTarget(x); setMergeSearch(`${x.brand} ${x.series || ''}`); }}
+                      className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-bg4 text-sm flex justify-between">
+                      <span>{x.brand} {x.series}</span>
+                      <span className="text-text3 text-xs">{x.cpu} · {x.ram} · {x.in_stock} {tt('шт.')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {mergeTarget && (
             <div className="flex items-center gap-2 flex-wrap">
               <button className="btn btn-danger btn-sm" onClick={confirmMerge} disabled={merging}>

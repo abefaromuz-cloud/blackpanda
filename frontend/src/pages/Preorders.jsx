@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
+import { useLibraryText } from '../hooks/useLibraryText';
 
 const PREPAY_OPTIONS = [
   [0, '0% (наценка 9%)'],
@@ -11,6 +12,13 @@ const PREPAY_OPTIONS = [
   [100, '100% (наценка 3%)'],
 ];
 function markupFor(pct) { return pct >= 100 ? 3 : pct >= 50 ? 6 : 9; }
+
+function specsLine(l, tr, tt) {
+  return [
+    tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage), tr('gpu', l.gpu),
+    tr('color', l.color), l.touch === 'yes' ? tt('сенсорный') : null,
+  ].filter(Boolean).join(' ');
+}
 
 export default function Preorders() {
   const [list, setList] = useState([]);
@@ -21,9 +29,12 @@ export default function Preorders() {
   const [clientId, setClientId] = useState('');
   const [prepaymentPct, setPrepaymentPct] = useState(0);
   const [items, setItems] = useState([{ laptop_id: '', qty: 1, cost_cny: '', logistics_cny: 200 }]);
+  const [pickerOpenIdx, setPickerOpenIdx] = useState(null);
+  const [pickerQuery, setPickerQuery] = useState('');
   const { can } = useAuth();
   const { t } = useLang();
   const tt = useTT();
+  const { tr } = useLibraryText();
   const canEdit = can('preorders', 'edit');
 
   function load() { api.get('/preorders').then(r => setList(r.data)); }
@@ -33,6 +44,15 @@ export default function Preorders() {
     api.get('/laptops').then(r => setLaptops(r.data));
     api.get('/settings/public-rate').then(r => setRate(r.data.rate));
   }, []);
+
+  const pickerResults = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    if (!q) return laptops.slice(0, 30);
+    return laptops.filter(l => {
+      const hay = [l.brand, l.series, l.cpu, l.ram, l.storage, l.gpu, l.color, l.mfr_item_code].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    }).slice(0, 30);
+  }, [laptops, pickerQuery]);
 
   function updateItem(i, patch) {
     setItems(arr => arr.map((it, idx) => idx === i ? { ...it, ...patch } : it));
@@ -96,15 +116,46 @@ export default function Preorders() {
             const unitRub = Math.round(unit * rate);
             return (
               <div key={i} className="bg-bg3 rounded-xl p-3 mb-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                  <select className="inp" value={it.laptop_id} onChange={e => updateItem(i, { laptop_id: e.target.value })} required>
-                    <option value="">{t('model')}</option>
-                    {laptops.map(l => (
-                      <option key={l.id} value={l.id}>
-                        {l.brand} {l.series} — {[l.cpu, l.ram, l.storage, l.gpu, l.color, l.touch === 'yes' ? 'сенсор' : null].filter(Boolean).join(' / ')}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mb-2">
+                  {it.laptop_id && pickerOpenIdx !== i ? (
+                    (() => {
+                      const picked = laptops.find(l => l.id === it.laptop_id);
+                      if (!picked) return null;
+                      return (
+                        <div className="bg-bg4 rounded-xl p-2.5 flex items-start gap-2.5">
+                          <img src={picked.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-11 h-11 object-contain rounded-lg bg-bg3 flex-shrink-0" alt="" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm">{tr('brand', picked.brand)} {tr('series', picked.series)}</div>
+                            <div className="text-xs text-text3">{specsLine(picked, tr, tt)}</div>
+                          </div>
+                          <button type="button" className="text-text3 hover:text-accent2 text-xs flex-shrink-0" onClick={() => { setPickerOpenIdx(i); setPickerQuery(''); }}>✏️ {tt('Изменить')}</button>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div>
+                      <input
+                        className="inp" autoFocus placeholder={tt("Начни вводить бренд, модель или характеристику...")}
+                        value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} onFocus={() => setPickerOpenIdx(i)}
+                      />
+                      {pickerOpenIdx === i && (
+                        <div className="mt-2 max-h-64 overflow-y-auto border border-border rounded-xl divide-y divide-border">
+                          {pickerResults.map(l => (
+                            <button type="button" key={l.id} onClick={() => { updateItem(i, { laptop_id: l.id }); setPickerOpenIdx(null); setPickerQuery(''); }} className="w-full flex items-start gap-2.5 p-2 hover:bg-bg4 text-left">
+                              <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-10 h-10 object-contain rounded-lg bg-bg4 flex-shrink-0" alt="" />
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm">{tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && '🔥'}</div>
+                                <div className="text-xs text-text3">{specsLine(l, tr, tt)}</div>
+                              </div>
+                            </button>
+                          ))}
+                          {!pickerResults.length && <div className="p-3 text-sm text-text3 text-center">{tt("Ничего не найдено")}</div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <input className="inp" type="number" min="1" placeholder={t('qty')} value={it.qty} onChange={e => updateItem(i, { qty: e.target.value })} />
                   <input className="inp" type="number" placeholder={t('costPrice') + ' ¥'} value={it.cost_cny} onChange={e => updateItem(i, { cost_cny: e.target.value })} />
                   <select className="inp" value={it.logistics_cny} onChange={e => updateItem(i, { logistics_cny: Number(e.target.value) })}>

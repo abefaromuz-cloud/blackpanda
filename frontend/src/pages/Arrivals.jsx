@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
 import { useLibraryText } from '../hooks/useLibraryText';
+import { exportToExcel } from '../utils/export';
 
 // Строка характеристик в одну строку — переиспользуется и в форме, и в отчёте
 function specsLine(l, tr, tt) {
@@ -67,6 +68,32 @@ export default function Arrivals() {
   }
 
   const grandTotal = report.reduce((s, r) => s + r.totalQty, 0);
+
+  const ARRIVAL_COLUMNS = [
+    { key: 'brand', label: 'Бренд', labelZh: '品牌' },
+    { key: 'series', label: 'Серия', labelZh: '系列' },
+    { key: 'cpu', label: 'CPU', labelZh: '处理器' },
+    { key: 'ram', label: 'RAM', labelZh: '内存' },
+    { key: 'storage', label: 'Накопитель', labelZh: '存储' },
+    { key: 'gpu', label: 'Видеокарта', labelZh: '显卡' },
+    { key: 'color', label: 'Цвет', labelZh: '颜色' },
+    { key: 'touch', label: 'Сенсор', labelZh: '触屏', value: it => it.touch === 'yes' ? tt('Да') : tt('Нет') },
+    { key: 'qty', label: 'Кол-во', labelZh: '数量', numeric: true },
+    { key: 'avg_cost_cny', label: 'Себестоимость ¥/шт', labelZh: '单价成本 ¥', numeric: true, value: it => Math.round(it.avg_cost_cny) },
+    { key: 'total_cost_cny', label: 'Итого ¥', labelZh: '总计 ¥', numeric: true, value: it => Math.round(it.total_cost_cny) },
+  ];
+
+  function exportDay(day) {
+    const dateLabel = new Date(day.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    exportToExcel({
+      filename: `BlackPanda_Prihod_${day.date}.xls`,
+      sheetName: t('arrivals'),
+      title: `${t('arrivalReport')} — ${dateLabel}`,
+      columns: ARRIVAL_COLUMNS,
+      rows: day.items,
+      footerRow: ['', '', '', '', '', '', tt('ИТОГО'), '', day.totalQty, '', Math.round(day.totalCostCny)],
+    });
+  }
 
   return (
     <div>
@@ -131,12 +158,15 @@ export default function Arrivals() {
         {report.length === 0 && <div className="text-text3 text-sm">—</div>}
         {report.map(day => (
           <div key={day.date} className="border-b border-border last:border-0 py-3">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
               <span className="font-bold text-sm">{new Date(day.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-              <span className="text-xs text-text3">{day.totalQty} {tt("шт.")} {day.totalCostCny > 0 && `· ¥${Math.round(day.totalCostCny)}`}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-text3">{day.totalQty} {tt("шт.")} {day.totalCostCny > 0 && `· ¥${Math.round(day.totalCostCny)}`}</span>
+                <button onClick={() => exportDay(day)} className="btn btn-secondary text-[11px] px-2 py-1">📊 Excel</button>
+              </span>
             </div>
             {day.items.map((it, i) => (
-              <Link key={i} to={`/warehouse/${it.laptop_id}`} className="flex justify-between items-center gap-3 text-sm py-1.5 hover:text-accent2 border-b border-border/40 last:border-0">
+              <Link key={i} to={`/warehouse/${it.laptop_id}`} className="flex justify-between items-center gap-3 text-sm py-1.5 hover:text-accent2">
                 <span className="min-w-0 truncate">
                   <span className="font-medium">{tr('brand', it.brand)} {tr('series', it.series)}</span>
                   {' '}
