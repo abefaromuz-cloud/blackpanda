@@ -11,12 +11,13 @@ router.get('/', authenticate, requirePermission('arrivals', 'view'), async (req,
   try {
     const result = await pool.query(`
       SELECT s.arrival_date::date AS date, l.id AS laptop_id, l.brand, l.series,
+        l.cpu, l.ram, l.storage, l.gpu, l.color, l.touch,
         COUNT(*) AS qty,
         COALESCE(SUM(COALESCE(s.cost_cny, l.cost_cny)),0) AS total_cost_cny,
         COALESCE(AVG(COALESCE(s.cost_cny, l.cost_cny)),0) AS avg_cost_cny
       FROM serials s JOIN laptops l ON l.id = s.laptop_id
       WHERE s.arrival_date IS NOT NULL
-      GROUP BY s.arrival_date::date, l.id, l.brand, l.series
+      GROUP BY s.arrival_date::date, l.id, l.brand, l.series, l.cpu, l.ram, l.storage, l.gpu, l.color, l.touch
       ORDER BY date DESC, l.brand
     `);
     // Группируем построчный результат по датам для удобного вывода на фронте
@@ -28,6 +29,7 @@ router.get('/', authenticate, requirePermission('arrivals', 'view'), async (req,
       byDate[key].totalCostCny += Number(row.total_cost_cny);
       byDate[key].items.push({
         laptop_id: row.laptop_id, brand: row.brand, series: row.series,
+        cpu: row.cpu, ram: row.ram, storage: row.storage, gpu: row.gpu, color: row.color, touch: row.touch,
         qty: Number(row.qty), total_cost_cny: Number(row.total_cost_cny), avg_cost_cny: Number(row.avg_cost_cny),
       });
     }

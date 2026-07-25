@@ -58,7 +58,7 @@ router.get('/', authenticate, requirePermission('service', 'view'), async (req, 
           'serial', s.serial, 'brand', l.brand, 'series', l.series,
           'cpu', l.cpu, 'ram', l.ram, 'gpu', l.gpu, 'storage', l.storage, 'color', l.color, 'screen', l.screen,
           'created_at', soi.created_at, 'image_url', l.image_url,
-          'sale_date', s.sale_date, 'warranty_months', s.warranty_months
+          'sale_date', s.sale_date, 'warranty_months', s.warranty_months, 'sale_client_id', s.sale_client_id
         ) ORDER BY soi.created_at) FILTER (WHERE soi.id IS NOT NULL), '[]') AS items
       FROM service_orders so
       LEFT JOIN clients c ON c.id = so.client_id
@@ -182,10 +182,25 @@ router.put('/:id/items/:itemId', authenticate, requirePermission('service', 'edi
       await client.query('INSERT INTO service_item_history (service_item_id, stage) VALUES ($1,$2)', [item.id, stage]);
     }
 
-    if (item.serial_id && stage === 'done' && return_status) {
-      await client.query(`UPDATE serials SET status_id=$1 WHERE id=$2`, [return_status, item.serial_id]);
-      await client.query(`INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,'Ремонт завершён')`, [item.serial_id, return_status]);
-      await client.query(`UPDATE service_order_items SET return_status=$1 WHERE id=$2`, [return_status, item.id]);
+    if (item.serial_id && stage === 'done') {
+      // Проверяем, был ли этот серийник уже продан клиенту ДО того, как попал в сервис.
+      // Если да — это гарантийный/платный ремонт уже проданного ноутбука: просто возвращаем
+      // его владельцу, статус на складе НЕ трогаем (иначе он снова "появится" в остатке и его
+      // можно случайно продать второй раз). Если серийник ещё не был продан — это ремонт
+      // своего товара на складе, тогда после ремонта он корректно возвращается в остаток.
+      const serialRow = await client.query('SELECT sale_client_id FROM serials WHERE id=$1', [item.serial_id]);
+      const alreadyOwned = !!serialRow.rows[0]?.sale_client_id;
+      if (alreadyOwned) {
+        await client.query(
+          `INSERT INTO serial_history (serial_id, status_id, note)
+           VALUES ($1, (SELECT status_id FROM serials WHERE id=$1), 'Ремонт завершён — возвращён владельцу')`,
+          [item.serial_id]
+        );
+      } else if (return_status) {
+        await client.query(`UPDATE serials SET status_id=$1 WHERE id=$2`, [return_status, item.serial_id]);
+        await client.query(`INSERT INTO serial_history (serial_id, status_id, note) VALUES ($1,$2,'Ремонт завершён')`, [item.serial_id, return_status]);
+        await client.query(`UPDATE service_order_items SET return_status=$1 WHERE id=$2`, [return_status, item.id]);
+      }
     }
 
     // Если ВСЕ позиции заявки выданы клиенту — проставляем дату завершения самой заявки
