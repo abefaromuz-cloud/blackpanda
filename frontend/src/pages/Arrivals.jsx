@@ -1,14 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
+import { useLibraryText } from '../hooks/useLibraryText';
+
+// Строка характеристик в одну строку — переиспользуется и в форме, и в отчёте
+function specsLine(l, tr, tt) {
+  return [
+    tr('cpu', l.cpu), tr('ram', l.ram), tr('storage', l.storage), tr('gpu', l.gpu),
+    tr('color', l.color), l.touch === 'yes' ? tt('сенсорный') : null,
+  ].filter(Boolean).join(' ');
+}
 
 export default function Arrivals() {
   const [report, setReport] = useState([]);
   const [laptops, setLaptops] = useState([]);
   const [laptopId, setLaptopId] = useState('');
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [serials, setSerials] = useState('');
   const [costCny, setCostCny] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -18,12 +29,30 @@ export default function Arrivals() {
   const { t } = useLang();
   const canEdit = can('arrivals', 'edit');
   const tt = useTT();
+  const { tr } = useLibraryText();
 
   function load() {
     api.get('/arrivals').then(r => setReport(r.data));
     api.get('/laptops').then(r => setLaptops(r.data));
   }
   useEffect(load, []);
+
+  const selectedLaptop = laptops.find(l => l.id === laptopId);
+
+  const pickerResults = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    if (!q) return laptops.slice(0, 30); // без запроса — показываем первые, чтобы список не был пустым
+    return laptops.filter(l => {
+      const hay = [l.brand, l.series, l.cpu, l.ram, l.storage, l.gpu, l.color, l.mfr_item_code].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    }).slice(0, 30);
+  }, [laptops, pickerQuery]);
+
+  function pickLaptop(l) {
+    setLaptopId(l.id);
+    setPickerOpen(false);
+    setPickerQuery('');
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -34,7 +63,7 @@ export default function Arrivals() {
       arrival_date: date ? new Date(date).toISOString() : null, note,
     });
     setMsg(`✅ ${tt('Добавлено')}: ${data.created}${data.skipped ? `, ${tt('пропущено дублей')}: ${data.skipped}` : ''}`);
-    setSerials(''); setCostCny(''); setNote(''); load();
+    setSerials(''); setCostCny(''); setNote(''); setLaptopId(''); load();
   }
 
   const grandTotal = report.reduce((s, r) => s + r.totalQty, 0);
@@ -46,18 +75,47 @@ export default function Arrivals() {
       {canEdit && (
         <form onSubmit={submit} className="card mb-5">
           <div className="font-bold text-sm mb-3">{t('arrivalForm')}</div>
-          <div className="grid md:grid-cols-2 gap-3 mb-3">
-            <select className="inp" value={laptopId} onChange={e => setLaptopId(e.target.value)} required>
-              <option value="">— {t('model')} —</option>
-              {laptops.map(l => (
-                <option key={l.id} value={l.id}>
-                  {l.brand} {l.series} — {[l.cpu, l.ram, l.storage, l.gpu, l.color].filter(Boolean).join(' / ')}
-                </option>
-              ))}
-            </select>
-            <input className="inp" type="date" value={date} onChange={e => setDate(e.target.value)} />
-            <input className="inp" type="number" placeholder={t('unitCost')} value={costCny} onChange={e => setCostCny(e.target.value)} />
-            <input className="inp" placeholder={t('comment')} value={note} onChange={e => setNote(e.target.value)} />
+
+          <div className="mb-3">
+            <label className="block text-[11px] text-text2 mb-1">{t('model')}</label>
+            {selectedLaptop && !pickerOpen ? (
+              <div className="bg-bg3 rounded-xl p-3 flex items-start gap-3">
+                <img src={selectedLaptop.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-14 h-14 object-contain rounded-lg bg-bg4 flex-shrink-0" alt="" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm">{tr('brand', selectedLaptop.brand)} {tr('series', selectedLaptop.series)}</div>
+                  <div className="text-xs text-text3">{specsLine(selectedLaptop, tr, tt)}</div>
+                </div>
+                <button type="button" className="text-text3 hover:text-accent2 text-xs flex-shrink-0" onClick={() => setPickerOpen(true)}>✏️ {tt('Изменить')}</button>
+              </div>
+            ) : (
+              <div>
+                <input
+                  className="inp" autoFocus={pickerOpen} placeholder={tt("Начни вводить бренд, модель или характеристику...")}
+                  value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} onFocus={() => setPickerOpen(true)}
+                />
+                {pickerOpen && (
+                  <div className="mt-2 max-h-72 overflow-y-auto border border-border rounded-xl divide-y divide-border">
+                    {pickerResults.map(l => (
+                      <button type="button" key={l.id} onClick={() => pickLaptop(l)} className="w-full flex items-start gap-3 p-2.5 hover:bg-bg3 text-left">
+                        <img src={l.image_url || ''} onError={e => e.target.style.display = 'none'} className="w-12 h-12 object-contain rounded-lg bg-bg3 flex-shrink-0" alt="" />
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm">{tr('brand', l.brand)} {tr('series', l.series)} {l.is_hot && '🔥'}</div>
+                          <div className="text-xs text-text3">{specsLine(l, tr, tt)}</div>
+                          <div className="text-[11px] text-text3">{tt("На складе")}: {l.in_stock}</div>
+                        </div>
+                      </button>
+                    ))}
+                    {!pickerResults.length && <div className="p-3 text-sm text-text3 text-center">{tt("Ничего не найдено")}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-3 mb-3">
+            <div><label className="block text-[11px] text-text2 mb-1">{tt("Дата")}</label><input className="inp" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+            <div><label className="block text-[11px] text-text2 mb-1">{t('unitCost')}</label><input className="inp" type="number" placeholder="¥" value={costCny} onChange={e => setCostCny(e.target.value)} /></div>
+            <div><label className="block text-[11px] text-text2 mb-1">{t('comment')}</label><input className="inp" placeholder={t('comment')} value={note} onChange={e => setNote(e.target.value)} /></div>
           </div>
           <textarea className="inp mb-3" rows={4} placeholder={tt("Серийные номера, по одному в строке")} value={serials} onChange={e => setSerials(e.target.value)} />
           <button className="btn btn-primary">{t('add')}</button>
@@ -78,9 +136,13 @@ export default function Arrivals() {
               <span className="text-xs text-text3">{day.totalQty} {tt("шт.")} {day.totalCostCny > 0 && `· ¥${Math.round(day.totalCostCny)}`}</span>
             </div>
             {day.items.map((it, i) => (
-              <Link key={i} to={`/warehouse/${it.laptop_id}`} className="flex justify-between text-sm py-1 hover:text-accent2">
-                <span>{it.brand} {it.series}</span>
-                <span className="font-mono text-text3">{it.qty} {tt("шт.")} {it.avg_cost_cny > 0 && `· ¥${Math.round(it.avg_cost_cny)}/${tt("шт")}`}</span>
+              <Link key={i} to={`/warehouse/${it.laptop_id}`} className="flex justify-between items-center gap-3 text-sm py-1.5 hover:text-accent2 border-b border-border/40 last:border-0">
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">{tr('brand', it.brand)} {tr('series', it.series)}</span>
+                  {' '}
+                  <span className="text-text3">{specsLine(it, tr, tt)}</span>
+                </span>
+                <span className="font-mono text-text3 flex-shrink-0">{it.qty} {tt("шт.")} {it.avg_cost_cny > 0 && `· ¥${Math.round(it.avg_cost_cny)}/${tt("шт")}`}</span>
               </Link>
             ))}
           </div>

@@ -505,7 +505,13 @@ export default function Service() {
               <input className="inp mb-3" placeholder={tt('Трек-номер (необязательно)')} value={confirmStage.tracking} onChange={e => setConfirmStage(s => ({ ...s, tracking: e.target.value }))} />
             )}
             {confirmStage.stage === 'done' && confirmStage.item.serial_id && (
-              <input className="inp mb-3" placeholder={tt('Статус серийника после ремонта')} value={confirmStage.returnStatus} onChange={e => setConfirmStage(s => ({ ...s, returnStatus: e.target.value }))} />
+              confirmStage.item.sale_client_id ? (
+                <div className="text-xs bg-bg3 rounded-lg p-2 mb-3">
+                  ✅ {tt('Этот ноутбук уже был продан этому клиенту раньше — просто отмечаем возврат после ремонта. Остаток на складе не меняется, повторно продать его будет нельзя.')}
+                </div>
+              ) : (
+                <input className="inp mb-3" placeholder={tt('Статус серийника после ремонта')} value={confirmStage.returnStatus} onChange={e => setConfirmStage(s => ({ ...s, returnStatus: e.target.value }))} />
+              )
             )}
             <div className="text-[11px] text-text3 mb-3">{tt('Запишется дата, время и твоё имя — попадёт в историю устройства.')}</div>
             <div className="flex gap-2">
