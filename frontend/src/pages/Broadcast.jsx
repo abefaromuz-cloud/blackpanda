@@ -33,8 +33,12 @@ export default function Broadcast() {
 
   async function send() {
     if (!message.trim() || !selected.length) return;
-    const { data } = await api.post('/broadcast/send', { client_ids: selected, message });
-    setResult(data);
+    try {
+      const { data } = await api.post('/broadcast/send', { client_ids: selected, message });
+      setResult(data);
+    } catch (e2) {
+      setResult({ sent: 0, failed: selected.length, errors: [], requestError: e2.response?.data?.error || 'Не удалось отправить запрос на сервер' });
+    }
   }
 
   async function saveTemplate() {
@@ -110,7 +114,21 @@ export default function Broadcast() {
             <button className="btn btn-secondary btn-sm" onClick={saveTemplate}>💾 {t('addTemplate')}</button>
           </div>
           <button className="btn btn-primary w-full justify-center" onClick={send}>📢 {t('sendBroadcast')} ({selected.length})</button>
-          {result && <div className="mt-3 text-sm">✅ {result.sent} · ❌ {result.failed}</div>}
+          {result && (
+            <div className="mt-3 text-sm">
+              <div>✅ {result.sent} · ❌ {result.failed}</div>
+              {result.requestError && <div className="text-red text-xs mt-1">{result.requestError}</div>}
+              {result.errors && result.errors.length > 0 && (
+                <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                  {result.errors.map((e2, i) => (
+                    <div key={i} className="text-xs text-red">
+                      {e2.client}{e2.telegram ? ` (${e2.telegram})` : ''}: {e2.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 pt-4 border-t border-border">
             <div className="font-bold text-sm mb-2">✨ {tt('Персонализировать с ИИ')}</div>

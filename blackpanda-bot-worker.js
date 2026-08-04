@@ -4,14 +4,8 @@
 // ═══════════════════════════════════════════════════════
 
 const BOT_TOKEN = '8689009234:AAFcAGJy2vtSPot9VbjrBaUgWwFnlP5mCn4'; // TODO: см. примечание в чате — этот токен светился в переписке, лучше перевыпустить через @BotFather (/revoke) и вставить сюда новый
-const CRM_API_URL = 'https://blackpanda-production-2354.up.railway.app'; // адрес бэкенда, без / на конце
-// Бот логинится как обычный сотрудник CRM (через уже существующий /api/auth/login) —
-// никаких новых эндпоинтов в бэкенде для этого не требуется.
-// В Админке → Сотрудники заведи отдельную учётку специально для бота (не свою личную!),
-// роль staff, и дай ей право можно ТОЛЬКО «Просмотр» на раздел «Склад» — тогда даже если
-// логин/пароль когда-нибудь утекут, через них нельзя будет ничего продать/изменить.
-const BOT_LOGIN_EMAIL = 'blackbot';
-const BOT_LOGIN_PASSWORD = 'blackpandabot1_2';
+const CRM_API_URL = 'https://ЗАМЕНИ_НА_АДРЕС_ТВОЕГО_BACKEND'; // например https://blackpanda-backend.up.railway.app — без слэша на конце
+const CRM_BOT_KEY = 'ЗАМЕНИ_НА_ТОТ_ЖЕ_КЛЮЧ_ЧТО_И_В_BOT_API_KEY_НА_БЭКЕНДЕ';
 const ADMIN_CHAT_ID = '1647536586'; // твой ID — уведомления о запросах клиентов
 
 // ═══════════════════════════════════════════════════════
@@ -150,54 +144,16 @@ async function notifyAdmin(text) {
   } catch(e) {}
 }
 
-// ═══ Авторизация в CRM как обычный сотрудник (через уже существующий /api/auth/login) ═══
-// Токен кэшируем в памяти воркера между запросами, чтобы не логиниться на каждое сообщение.
-let cachedToken = null;
-let tokenExpiresAt = 0;
-
-async function getAuthToken(forceRelogin) {
-  if (!forceRelogin && cachedToken && Date.now() < tokenExpiresAt) return cachedToken;
-  const resp = await fetch(`${CRM_API_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: BOT_LOGIN_EMAIL, password: BOT_LOGIN_PASSWORD })
-  });
-  if (!resp.ok) throw new Error('Не удалось авторизоваться в CRM: ' + resp.status);
-  const data = await resp.json();
-  cachedToken = data.token;
-  // На бэкенде токен живёт 12 часов — обновляем заранее, с запасом в час, чтобы не ловить 401 посреди дня
-  tokenExpiresAt = Date.now() + 11 * 60 * 60 * 1000;
-  return cachedToken;
-}
-
 // ═══ Загрузить данные из новой CRM (Postgres/Express), а не из Firebase ═══
 async function getCrmData() {
-  const token = await getAuthToken(false);
-  const authedGet = (path, tok) => fetch(`${CRM_API_URL}${path}`, { headers: { Authorization: `Bearer ${tok}` } });
-
-  let [laptopsResp, rateResp] = await Promise.all([
-    authedGet('/api/laptops', token),
-    authedGet('/api/settings/public-rate', token),
-  ]);
-
-  // Токен мог протухнуть раньше расчётного времени (например, учётку бота деактивировали
-  // и снова включили) — на этот случай один раз перелогиниваемся и повторяем запрос.
-  if (laptopsResp.status === 401 || rateResp.status === 401) {
-    const freshToken = await getAuthToken(true);
-    [laptopsResp, rateResp] = await Promise.all([
-      authedGet('/api/laptops', freshToken),
-      authedGet('/api/settings/public-rate', freshToken),
-    ]);
-  }
-
-  if (!laptopsResp.ok) throw new Error('CRM API error (laptops): ' + laptopsResp.status);
-  if (!rateResp.ok) throw new Error('CRM API error (rate): ' + rateResp.status);
-
-  const allLaptops = await laptopsResp.json();
-  const rateData = await rateResp.json();
-  // /api/laptops отдаёт и архивные модели тоже — архив в список склада бота не показываем
-  const laptops = allLaptops.filter(l => !l.is_archived);
-  return { laptops, rate: Number(rateData.rate) || 0 };
+  const resp = await fetch(`${CRM_API_URL}/api/public/bot/stock`, {
+    headers: { 'x-bot-key': CRM_BOT_KEY }
+  });
+  if (!resp.ok) throw new Error('CRM API error: ' + resp.status);
+  const data = await resp.json();
+  // Бэкенд уже отдаёт остаток (in_stock) готовым — считать его тут вручную по серийникам
+  // (как раньше по statusId==='s2' в Firestore) больше не нужно.
+  return { laptops: data.laptops || [], rate: Number(data.rate) || 0 };
 }
 
 // ═══ Построить сообщение со складом ═══
