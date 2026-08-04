@@ -6,6 +6,7 @@ import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
 import { beep } from '../utils/sound';
 import { printReceipt } from '../utils/print';
+import { useToast } from '../toast/ToastContext';
 
 export default function PreorderDetail() {
   const { id } = useParams();
@@ -22,8 +23,10 @@ export default function PreorderDetail() {
   const [dueDate, setDueDate] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [err, setErr] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { can } = useAuth();
   const { t } = useLang();
+  const { showToast } = useToast();
   const canEdit = can('preorders', 'edit');
   const tt = useTT();
 
@@ -64,7 +67,9 @@ export default function PreorderDetail() {
   }
 
   async function confirmTransfer() {
+    if (submitting) return; // уже отправляем — игнорируем повторный клик/тап
     setErr('');
+    setSubmitting(true);
     try {
       const body = {
         serials: scanned.filter(s => s.ok).map(s => s.serial), payment_mode: paymentMode, pay_dest: payDest,
@@ -75,9 +80,12 @@ export default function PreorderDetail() {
         clientName: po.client_name, totalRub: data.totalRub, totalCny: data.totalCny,
         items: scanned.filter(s => s.ok).map(s => ({ brand: '', series: '', serials: [s.serial], qty: 1, totalCny: '' })),
       });
+      showToast('✅ ' + tt('Товар передан клиенту'));
       setScanned([]); load();
     } catch (e2) {
       setErr(e2.response?.data?.error || 'Ошибка передачи');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -193,7 +201,9 @@ export default function PreorderDetail() {
               ) : (
                 <div className="text-xs text-green mb-2">✓ {tt('Предзаказ полностью оплачен — просто передай товар')}</div>
               )}
-              <button className="btn btn-primary w-full justify-center" onClick={confirmTransfer}>{t('confirmSale')}</button>
+              <button className="btn btn-primary w-full justify-center" onClick={confirmTransfer} disabled={submitting}>
+                {submitting ? '⏳ ' + tt('Оформляем…') : t('confirmSale')}
+              </button>
             </>
           )}
         </div>

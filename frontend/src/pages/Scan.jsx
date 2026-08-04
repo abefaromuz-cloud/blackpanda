@@ -6,6 +6,7 @@ import { printReceipt } from '../utils/print';
 import { beep } from '../utils/sound';
 import { useLang } from '../i18n/LangContext';
 import { useTT } from '../i18n/useTT';
+import { useToast } from '../toast/ToastContext';
 
 export default function Scan() {
   const scanInputRef = useRef(null);
@@ -17,6 +18,11 @@ export default function Scan() {
   }, []);
   const { t } = useLang();
   const tt = useTT();
+  const { showToast } = useToast();
+  // Пока true — запрос на продажу/резерв уже отправлен и ждём ответ сервера.
+  // Блокирует кнопку и защищает от повторной отправки той же продажи, если
+  // сервер отвечает не мгновенно, а человек за это время нажимает ещё раз.
+  const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
   const [scanInput, setScanInput] = useState('');
   const [scanned, setScanned] = useState([]); // {serial, status: 'ok'|'notfound'|'sold', laptop}
@@ -132,7 +138,9 @@ export default function Scan() {
   const client = clients.find(c => c.id === clientId);
 
   async function confirmSale() {
+    if (submitting) return; // уже отправляем — игнорируем повторный клик/тап
     setErr('');
+    setSubmitting(true);
     try {
       const items = groups.map(g => ({ laptop_id: g.laptop_id, serials: g.serials, price_sell_cny: unitPrice(g.laptop_id) }));
       const body = {
@@ -146,22 +154,30 @@ export default function Scan() {
         clientName: client?.name, note, discountRub: Number(discountRub) || 0, totalRub: finalRub, totalCny: finalCny,
         items: groups.map(g => ({ brand: g.brand, series: g.series, serials: g.serials, qty: g.serials.length, totalCny: (unitPrice(g.laptop_id) * g.serials.length).toFixed(0) })),
       });
+      showToast('✅ ' + tt('Продажа оформлена'));
       resetWizard();
     } catch (e2) {
       setErr(e2.response?.data?.error || tt('Ошибка оформления продажи'));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function confirmReserve() {
+    if (submitting) return;
     setErr('');
+    setSubmitting(true);
     try {
       await api.post('/reservations', {
         serials: scanned.filter(s => s.status === 'ok').map(s => s.serial),
         client_id: clientId || null, deadline: dueDate ? new Date(dueDate).toISOString() : null, note,
       });
+      showToast('🔒 ' + tt('Товар зарезервирован'));
       resetWizard();
     } catch (e2) {
       setErr(e2.response?.data?.error || tt('Ошибка резервирования'));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -349,8 +365,16 @@ export default function Scan() {
             <div className="flex gap-2 flex-wrap justify-between">
               <button className="btn btn-secondary" onClick={() => setStep(2)}>← {t('back')}</button>
               <div className="flex gap-2">
-                <button className="btn btn-secondary" onClick={confirmReserve}>🔒 {t('reserve')}</button>
-                <button className="btn btn-primary" onClick={confirmSale} disabled={paymentMode === 'split' && Math.abs((Number(splitCash) || 0) + (Number(splitBank) || 0) - finalRub) > 1}>✓ {t('confirmSale')}</button>
+                <button className="btn btn-secondary" onClick={confirmReserve} disabled={submitting}>
+                  🔒 {submitting ? tt('Подождите…') : t('reserve')}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={confirmSale}
+                  disabled={submitting || (paymentMode === 'split' && Math.abs((Number(splitCash) || 0) + (Number(splitBank) || 0) - finalRub) > 1)}
+                >
+                  {submitting ? '⏳ ' + tt('Оформляем…') : '✓ ' + t('confirmSale')}
+                </button>
               </div>
             </div>
           </div>

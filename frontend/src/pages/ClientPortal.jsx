@@ -5,10 +5,14 @@ import { useLang } from '../i18n/LangContext';
 
 export default function ClientPortal() {
   const [data, setData] = useState(null);
+  const [stock, setStock] = useState(null);
   const { logout } = useAuth();
   const { t, lang, setLang } = useLang();
 
-  useEffect(() => { api.get('/client-portal').then(r => setData(r.data)); }, []);
+  useEffect(() => {
+    api.get('/client-portal').then(r => setData(r.data));
+    api.get('/client-portal/stock').then(r => setStock(r.data));
+  }, []);
 
   if (!data) return <div className="min-h-screen bg-bg flex items-center justify-center text-text3">{t('loading')}</div>;
 
@@ -30,6 +34,32 @@ export default function ClientPortal() {
         {Number(data.debt_rub) > 0 && (
           <div className="mb-4 p-3 rounded-lg bg-red/10 border border-red text-red text-sm">
             {t('myDebt')}: {Math.round(data.debt_rub).toLocaleString('ru-RU')} ₽
+          </div>
+        )}
+
+        {stock && stock.laptops.length > 0 && (
+          <div className="card mb-4">
+            <div className="font-bold text-sm mb-3">{t('inStock')}</div>
+            {Object.entries(
+              stock.laptops.reduce((acc, l) => {
+                (acc[l.brand] = acc[l.brand] || []).push(l);
+                return acc;
+              }, {})
+            ).map(([brand, items]) => (
+              <div key={brand} className="mb-3 last:mb-0">
+                <div className="text-xs font-bold text-text3 uppercase mb-1">{brand}</div>
+                {items.map(l => (
+                  <div key={l.id} className="flex justify-between items-center text-sm py-1.5 border-b border-border last:border-0 gap-2">
+                    <span className="text-text2">
+                      {[l.series, l.cpu, l.gpu, l.ram, l.storage].filter(Boolean).join(' · ')}
+                    </span>
+                    <span className="font-mono whitespace-nowrap">
+                      {l.in_stock} {t('pcs')} · {Math.round(l.price_sell_cny * stock.rate).toLocaleString('ru-RU')} ₽
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
 
