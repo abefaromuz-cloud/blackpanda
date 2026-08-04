@@ -1,6 +1,14 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
+
+// JWT_SECRET обязателен и не должен иметь дефолт: если его забыть выставить на проде,
+// сервер раньше тихо подписывал бы токены известным всем значением 'change_this_secret' —
+// то есть любой мог бы сам сгенерировать себе валидный токен администратора.
+// Лучше явно упасть при старте, чем незаметно работать в небезопасном режиме.
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET не задан в переменных окружения. Задайте длинную случайную строку в .env перед запуском сервера.');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function authenticate(req, res, next) {
   const header = req.headers.authorization;

@@ -57,7 +57,10 @@ router.post('/', authenticate, requirePermission('sales', 'edit'), async (req, r
       if (!laptop) throw { status: 400, message: 'Модель не найдена' };
       const sers = [];
       for (const sn of it.serials) {
-        const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved'))`, [sn]);
+        // FOR UPDATE — блокируем строку серийника до конца транзакции, чтобы два параллельных
+        // запроса (например, повторный клик или два сотрудника) не смогли одновременно
+        // прочитать один и тот же серийник как «свободен» и продать его дважды.
+        const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved')) FOR UPDATE`, [sn]);
         if (!sr.rows[0]) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
         sers.push(sr.rows[0]);
       }

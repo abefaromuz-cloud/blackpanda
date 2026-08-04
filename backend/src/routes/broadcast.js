@@ -7,20 +7,41 @@ const router = express.Router();
 
 // Сгенерировать текст со списком товаров в наличии (для рассылки "склад актуальный")
 router.get('/stock-message', authenticate, requirePermission('broadcast', 'view'), async (req, res) => {
-  const laptops = await pool.query(`
-    SELECT l.*, COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS in_stock
-    FROM laptops l LEFT JOIN serials s ON s.laptop_id=l.id
-    WHERE l.is_archived=false GROUP BY l.id HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) > 0
-    ORDER BY l.brand, l.series
-  `);
-  const settings = await pool.query('SELECT rate FROM settings WHERE id=1');
-  const rate = Number(settings.rows[0].rate);
-  let msg = `🐼 BlackPanda — склад актуальный\nКурс: ${rate} ₽/¥\n\n`;
-  for (const l of laptops.rows) {
-    const priceRub = Math.round(Number(l.price_sell_cny) * rate);
-    msg += `▪️ ${l.brand} ${l.series} | ${l.cpu || ''} | ${l.ram || ''}\n   ${l.in_stock} шт. → ¥${l.price_sell_cny} / ${priceRub.toLocaleString('ru-RU')} ₽\n\n`;
-  }
-  res.json({ message: msg });
+  try {
+    const laptops = await pool.query(`
+      SELECT l.*, COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) AS in_stock
+      FROM laptops l LEFT JOIN serials s ON s.laptop_id=l.id
+      WHERE l.is_archived=false GROUP BY l.id HAVING COUNT(s.id) FILTER (WHERE s.status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')) > 0
+      ORDER BY l.brand, l.series
+    `);
+    const settings = await pool.query('SELECT rate FROM settings WHERE id=1');
+    const rate = Number(settings.rows[0].rate);
+    const today = new Date().toLocaleDateString('ru-RU');
+
+    // Группируем по бренду с заголовком-разделителем — так же, как было в старой версии
+    const brands = {};
+    for (const l of laptops.rows) { (brands[l.brand] = brands[l.brand] || []).push(l); }
+
+    let msg = `🐼 BlackPanda | Склад актуальный\n📅 ${today} | Курс: ${rate} ₽/¥\n`;
+    for (const [brand, items] of Object.entries(brands)) {
+      msg += `\n━━━━━━━━━━━━━━━━━━\n💻 ${(brand || '').toUpperCase()}\n`;
+      for (const l of items) {
+        const priceRub = Math.round(Number(l.price_sell_cny) * rate);
+        // Полный набор характеристик — раньше отдавали только CPU и RAM, потеряв GPU/накопитель/экран/цвет/сенсор
+        let line = `▪️ ${l.series || ''}`;
+        if (l.cpu) line += ` | ${l.cpu}`;
+        if (l.gpu) line += ` | ${l.gpu}`;
+        if (l.ram) line += ` | ${l.ram}`;
+        if (l.storage) line += ` | ${l.storage}`;
+        if (l.screen) line += ` | ${l.screen}`;
+        if (l.color) line += ` | ${l.color}`;
+        if (l.touch === 'yes') line += ` | 👆 Сенсорный`;
+        line += `\n   ${l.in_stock} шт. → ¥${l.price_sell_cny} / ${priceRub.toLocaleString('ru-RU')} ₽\n`;
+        msg += line;
+      }
+    }
+    res.json({ message: msg });
+  } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
 // Отправить сообщение выбранным клиентам (у которых указан telegram)

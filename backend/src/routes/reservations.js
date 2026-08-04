@@ -38,7 +38,8 @@ router.post('/', authenticate, requirePermission('warehouse', 'edit'), async (re
     await client.query('BEGIN');
     const created = [];
     for (const sn of serials) {
-      const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock')`, [sn]);
+      // FOR UPDATE — см. комментарий в sales.js: исключаем гонку при параллельном резерве/продаже
+      const sr = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as='instock') FOR UPDATE`, [sn]);
       if (!sr.rows[0]) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
       await client.query(`UPDATE serials SET status_id='Зарезервирован' WHERE id=$1`, [sr.rows[0].id]);
       const r = await client.query(

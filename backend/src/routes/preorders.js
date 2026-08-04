@@ -186,7 +186,8 @@ router.post('/:id/transfer', authenticate, requirePermission('preorders', 'edit'
 
     const byLaptop = {};
     for (const sn of scannedSerials) {
-      const serRes = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved'))`, [sn]);
+      // FOR UPDATE — см. комментарий в sales.js: исключаем гонку при параллельной передаче/продаже
+      const serRes = await client.query(`SELECT * FROM serials WHERE serial=$1 AND status_id IN (SELECT label FROM lib_statuses WHERE counts_as IN ('instock','reserved')) FOR UPDATE`, [sn]);
       const ser = serRes.rows[0];
       if (!ser) throw { status: 400, message: `Серийник ${sn} не найден на складе` };
       const poItem = poItems.find(it => it.laptop_id === ser.laptop_id && it.item_status !== 'transferred');
