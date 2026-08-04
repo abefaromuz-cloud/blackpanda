@@ -44,6 +44,25 @@ router.get('/stock-message', authenticate, requirePermission('broadcast', 'view'
   } catch (err) { res.status(500).json({ error: 'Внутренняя ошибка сервера' }); }
 });
 
+// Telegram отклоняет сообщение целиком, если оно длиннее 4096 символов — поэтому длинный текст
+// (например, полный список склада) режем на части по границам строк, чтобы не оборвать слово.
+function splitMessage(text, maxLen = 4000) {
+  if (text.length <= maxLen) return [text];
+  const chunks = [];
+  let current = '';
+  for (const line of text.split('\n')) {
+    if ((current + '\n' + line).length > maxLen) {
+      if (current) chunks.push(current);
+      current = line;
+    } else {
+      current = current ? current + '\n' + line : line;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // Отправить сообщение выбранным клиентам (у которых указан telegram)
 router.post('/send', authenticate, requirePermission('broadcast', 'edit'), async (req, res) => {
   const { client_ids, message } = req.body;
@@ -54,13 +73,15 @@ router.post('/send', authenticate, requirePermission('broadcast', 'edit'), async
   for (const c of clients.rows) {
     if (!c.telegram) { failed++; errors.push({ client: c.name, telegram: null, reason: 'Не указан Telegram' }); continue; }
     const personal = message.replace(/{name}/g, c.name).replace(/{phone}/g, c.phone || '—');
-    const result = await sendTelegramMessage(c.telegram, personal);
-    if (result.ok) sent++;
-    else {
-      failed++;
-      // result.raw — это сырой ответ Telegram API (например description: "Bad Request: chat not found")
-      errors.push({ client: c.name, telegram: c.telegram, reason: result.raw?.description || result.error || 'Неизвестная ошибка' });
+    const chunks = splitMessage(personal);
+    let clientOk = true, lastError = null;
+    for (const chunk of chunks) {
+      const result = await sendTelegramMessage(c.telegram, chunk);
+      if (!result.ok) { clientOk = false; lastError = result.raw?.description || result.error || 'Неизвестная ошибка'; break; }
+      if (chunks.length > 1) await sleep(300); // не долбить Telegram API слишком часто при многочастных сообщениях
     }
+    if (clientOk) sent++;
+    else { failed++; errors.push({ client: c.name, telegram: c.telegram, reason: lastError }); }
   }
   await logActivity(req.user, 'Рассылка', 'broadcast', `${sent} доставлено, ${failed} ошибок`);
   res.json({ sent, failed, errors });
