@@ -50,14 +50,20 @@ router.post('/send', authenticate, requirePermission('broadcast', 'edit'), async
   if (!Array.isArray(client_ids) || !client_ids.length || !message) return res.status(400).json({ error: 'Укажите получателей и текст' });
   const clients = await pool.query('SELECT * FROM clients WHERE id = ANY($1::uuid[])', [client_ids]);
   let sent = 0, failed = 0;
+  const errors = []; // причина отказа по каждому клиенту — чтобы не гадать вслепую, почему не дошло
   for (const c of clients.rows) {
-    if (!c.telegram) { failed++; continue; }
+    if (!c.telegram) { failed++; errors.push({ client: c.name, telegram: null, reason: 'Не указан Telegram' }); continue; }
     const personal = message.replace(/{name}/g, c.name).replace(/{phone}/g, c.phone || '—');
     const result = await sendTelegramMessage(c.telegram, personal);
-    if (result.ok) sent++; else failed++;
+    if (result.ok) sent++;
+    else {
+      failed++;
+      // result.raw — это сырой ответ Telegram API (например description: "Bad Request: chat not found")
+      errors.push({ client: c.name, telegram: c.telegram, reason: result.raw?.description || result.error || 'Неизвестная ошибка' });
+    }
   }
   await logActivity(req.user, 'Рассылка', 'broadcast', `${sent} доставлено, ${failed} ошибок`);
-  res.json({ sent, failed });
+  res.json({ sent, failed, errors });
 });
 
 module.exports = router;
